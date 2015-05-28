@@ -13,19 +13,35 @@ namespace avplus.sockets
         #region declarations
         protected ClientForm parent; // for delegates
 
+        private byte[] buff = new byte[1024 * 10];
         protected byte[] delim = { 13, 10 };
-        //private byte[] buff = new byte[1024 * 10];
-        //protected CircularBuffer cb = new CircularBuffer();
 
+        protected CircularBuffer cb = new CircularBuffer();
         Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         public ConnectionList Connections = new ConnectionList();
+
+        public delegate void CallbackDelegate(object sender, CallbackEventArgs e);
+        public event CallbackDelegate Callback_EventHandler;
 
         public delegate void Accept_Delegate(object sender, Accept_EventArgs e);
         public event Accept_Delegate Accept_EventHandler;
 
+        public delegate void Closed_Delegate(object sender, Closed_EventArgs e);
+        public event Closed_Delegate Closed_EventHandler;
+
+        public class CallbackEventArgs : EventArgs
+        {
+            public byte[] buffer { get; set; }
+        }
+
         public class Accept_EventArgs : EventArgs
         {
             public string ip { get; set; }
+        }
+
+        public class Closed_EventArgs : EventArgs
+        {
+            public Socket socket { get; set; }
         }
         #endregion
 
@@ -42,6 +58,23 @@ namespace avplus.sockets
             ThreadPool.QueueUserWorkItem(new WaitCallback(Accept));
         }
 
+        public void AcceptCallback(IAsyncResult ar)
+        {
+            Debug("AcceptCallback");
+            Socket s = (Socket)ar.AsyncState;
+            Socket TcpSocket = s.EndAccept(ar);
+            Connections.Add(new Connection(TcpSocket));
+            if (Accept_EventHandler != null)
+            {
+                Accept_EventArgs args = new Accept_EventArgs();
+                args.ip = TcpSocket.RemoteEndPoint.ToString();
+                Accept_EventHandler(this, args);
+            }
+            TcpSocket.BeginReceive(buff, 0, buff.Length, SocketFlags.None, new AsyncCallback(WriteToBuffer), TcpSocket);
+            Debug("Connection accepted from " + TcpSocket.RemoteEndPoint.ToString());
+            SendAcceptMessage();
+        }
+
         public void Accept(object o)
         {
             Debug("Accept");
@@ -49,155 +82,6 @@ namespace avplus.sockets
             {
                 Thread.Sleep(500);
                 socket.BeginAccept(new AsyncCallback(AcceptCallback), socket);
-            }
-        }
-        public void AcceptCallback(IAsyncResult ar)
-        {
-            Debug("AcceptCallback");
-            Socket s = (Socket)ar.AsyncState;
-            Socket TcpSocket = s.EndAccept(ar);
-            Connection c = new Connection(this, TcpSocket);
-            Connections.Add(c);
-        }
-
-        public virtual void Send(Connection c, string msg)
-        {
-            byte[] b = Encoding.Default.GetBytes(msg);
-            //Debug("SendSocket: " + Utils.createHexPrintableString(b));
-            /*
-            foreach (Connection cl in Connections)
-                if (cl.ClientSocket.Connected)
-                    cl.ClientSocket.Send(b);
-            */
-            if (c.ClientSocket.Connected)
-                c.ClientSocket.Send(b);
-        }
-
-        public virtual void ProcessBuffer(Connection c) { }
-        public virtual void SendAcceptMessage(Connection c) { }
-
-        public void Debug(string str)
-        {
-            parent.Invoke(parent.debug, new Object[] { str });
-        }
-    }
-
-    #region Connection
-    // *****************************************************************
-    public class Connection
-    {
-        public Socket ClientSocket { get; set; }
-        public string ConnectionName { get; set; }
-        public DateTime LastActiveTime { get; set; }
-        public byte[] buff = new byte[1024 * 10];
-        public CircularBuffer cb = new CircularBuffer();
-        public bool _readlock;
-        public Object _bufferLock = new Object();
-
-        private SocketServer parent;
-
-        public virtual void ParseString(object sender, CallbackEventArgs e) { }
-        public virtual void ParseByteString(byte[] args) { }
-        //public virtual void BufferDataIn() { }
-
-        public delegate void Closed_Delegate(object sender, Closed_EventArgs e);
-        public event Closed_Delegate Closed_EventHandler;
-        public class Closed_EventArgs : EventArgs
-        {
-            public Socket socket { get; set; }
-        }
-        //public delegate void CallbackDelegate(object sender, CallbackEventArgs e);
-        //public event CallbackDelegate Callback_EventHandler;
-        public class CallbackEventArgs : EventArgs
-        {
-            public byte[] buffer { get; set; }
-        }
-
-        public Connection(SocketServer parent, Socket clientSocket)
-            : this(parent, clientSocket, string.Empty)
-        {
-        }
-
-        public Connection(SocketServer parent, Socket clientSocket, string connectionName)
-        {
-            this.parent = parent;
-            this.ClientSocket = clientSocket;
-            this.ConnectionName = connectionName;
-            /*
-            if (Accept_EventHandler != null)
-            {
-                Accept_EventArgs args = new Accept_EventArgs();
-                args.ip = TcpSocket.RemoteEndPoint.ToString();
-                Accept_EventHandler(this, args);
-            }
-             * */
-            clientSocket.BeginReceive(buff, 0, buff.Length, SocketFlags.None, new AsyncCallback(WriteToBuffer), clientSocket);
-            parent.Debug("Connection accepted from " + clientSocket.RemoteEndPoint.ToString());
-            parent.SendAcceptMessage(this);
-        }
-
-        public void WriteToBuffer(IAsyncResult ar)
-        {
-            try
-            {
-                int revCount = ClientSocket.EndReceive(ar);
-                if (revCount > 0)
-                {
-                    Byte[] a = new Byte[revCount];
-                    //byte[] buff = Connections.Find(x => x.ClientSocket == client).buff;
-                    //IEnumerable<Connection> query = Connections.Where(x => x.ClientSocket == client);
-                    Buffer.BlockCopy(buff, 0, a, 0, revCount);
-                    cb.Write(a, 0, a.Length);
-                }
-                ClientSocket.BeginReceive(buff, 0, buff.Length, SocketFlags.None, new AsyncCallback(WriteToBuffer), ClientSocket);
-                BufferDataIn();
-            }
-            catch (SocketException ex)
-            {
-                if (ex.ErrorCode == 10054)
-                {
-                    Disconnect(ClientSocket);
-                }
-            }
-            finally
-            {
-            }
-        }
-
-        public void BufferDataIn()
-        {
-            if (!_readlock)
-            {
-                _readlock = true;
-                lock (_bufferLock)
-                {
-                    parent.ProcessBuffer(this);
-                    //ProcessBuffer();
-                }
-                if (cb.GetLength() > 0)
-                    ThreadPool.QueueUserWorkItem(new WaitCallback(ReadBuffer_Callback));
-                else
-                    _readlock = false;
-            }
-        }
-
-        public void ReadBuffer_Callback(object o)
-        {
-            try
-            {
-                while (cb.GetLength() > 0)
-                {
-                    Thread.Sleep(500);
-                    lock (_bufferLock)
-                    {
-                        parent.ProcessBuffer(this);
-                        //ProcessBuffer();
-                    }
-                }
-                _readlock = false;
-            }
-            catch (Exception e)
-            {
             }
         }
 
@@ -212,11 +96,155 @@ namespace avplus.sockets
             }
         }
 
-        protected void Debug(string str)
+        public virtual void ParseString(object sender, CallbackEventArgs e) { }
+        public virtual void ParseByteString(byte[] args) { }
+        public virtual void BufferDataIn() { }
+        public virtual void SendAcceptMessage() { }
+
+        #region buffer_parse_exanple
+        /*
+        public void GetBufferDelimittedItems(byte[] delim)
         {
-            parent.Debug( str );
+            lock (_bufferLock)
+            {
+                byte[] b1;
+                while (true)
+                {
+                    b1 = cb.ReadToDelimitter(delim);
+                    if (b1 == null)
+                        break;
+                    try
+                    {
+                        string s1 = Encoding.UTF8.GetString(b1);
+                        CallbackEventArgs args = new CallbackEventArgs();
+                        args.buffer = b1;
+                        if (Callback_EventHandler != null)
+                            Callback_EventHandler(this, args);
+                        ParseString(this, args);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug("Exception: " + e.ToString());
+                    }
+                }
+            }
+        }
+        public void ProcessBuffer()
+        {
+            lock (_bufferLock)
+            {
+                byte[] b1;
+                while (true)
+                {
+                    b1 = cb.GetBuffer();
+                    if (b1 == null)
+                        break;
+                    try
+                    {
+                        string s1 = Encoding.UTF8.GetString(b1);
+                        CallbackEventArgs args = new CallbackEventArgs();
+                        args.buffer = b1;
+                        if (Callback_EventHandler != null)
+                            Callback_EventHandler(this, args);
+                        ParseString(this, args);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug("Exception: " + e.ToString());
+                    }
+                }
+            }
+        }
+        public void ReadBuffer_Callback(object o)
+        {
+            while (cb.GetLength() > 0)
+            {
+                Thread.Sleep(500);
+                //GetBufferDelimittedItems(delim);
+                ProcessBuffer();
+            }
+            _readlock = false;
+        }
+        public void BufferDataIn()
+        {
+            if (!_readlock)
+            {
+                _readlock = true;
+                //GetBufferDelimittedItems(delim);
+                ProcessBuffer();
+                if (cb.GetLength() > 0)
+                    ThreadPool.QueueUserWorkItem(new WaitCallback(ReadBuffer_Callback));
+                else
+                   _readlock = false;
+            }
+        }
+        */
+        #endregion
+
+        public void WriteToBuffer(IAsyncResult ar)
+        {
+            Socket client = (Socket)ar.AsyncState;
+            try
+            {
+                int revCount = client.EndReceive(ar);
+                if (revCount > 0)
+                {
+                    Byte[] a = new Byte[revCount];
+                    Buffer.BlockCopy(buff, 0, a, 0, revCount);
+                    cb.Write(a, 0, a.Length);
+                }
+                client.BeginReceive(buff, 0, buff.Length, SocketFlags.None, new AsyncCallback(WriteToBuffer), client);
+                BufferDataIn();
+            }
+            catch (SocketException ex)
+            {
+                if (ex.ErrorCode == 10054)
+                {
+                    Disconnect(client);
+                }
+            }
+            finally
+            {
+            }
         }
 
+        public void Send(string msg)
+        {
+            byte[] b = Encoding.Default.GetBytes(msg);
+            //Debug("SendSocket: " + Utils.createHexPrintableString(b));
+            foreach (Connection cl in Connections)
+            {
+                if (cl.ClientSocket.Connected)
+                {
+                    cl.ClientSocket.Send(b);
+                }
+            }
+        }
+
+        protected void Debug(string str)
+        {
+            parent.Invoke(parent.debug, new Object[] { str });
+        }
+    }
+
+    #region Connection
+    // *****************************************************************
+    public class Connection
+    {
+        public Socket ClientSocket { get; set; }
+        public string ConnectionName { get; set; }
+        public DateTime LastActiveTime { get; set; }
+
+        public Connection(Socket clientSocket, string connectionName)
+        {
+            this.ClientSocket = clientSocket;
+            this.ConnectionName = connectionName;
+        }
+
+        public Connection(Socket clientSocket)
+            : this(clientSocket, string.Empty)
+        {
+        }
     }
     // *****************************************************************
     public class ConnectionList : System.Collections.CollectionBase
@@ -388,7 +416,7 @@ namespace avplus.sockets
             string s1 = Encoding.ASCII.GetString(buffer);
             string s2 = Encoding.ASCII.GetString(delim);
             int i = s1.IndexOf(s2);
-            return i > -1 ? Read(0, i + s2.Length) : null;
+            return i > -1 ? Read(0, i+s2.Length): null;
         }
 
         public void Write(byte[] buffer, int offset, int count)

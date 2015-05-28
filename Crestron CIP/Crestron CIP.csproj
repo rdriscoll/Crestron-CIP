@@ -49,6 +49,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Crestron CIP Server.cs" />
+    <Compile Include="CrestronJoins.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -69,6 +70,7 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <None Include="ClassDiagram1.cd" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -81,7 +83,10 @@
     <Compile Include="SocketServerManual.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="Utils.cs" />
+    <Compile Include="UiHandler.cs" />
+    <Compile Include="Utils.cs">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <COMReference Include="VPTCOMSERVERLib">
