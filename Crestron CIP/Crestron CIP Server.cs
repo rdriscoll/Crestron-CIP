@@ -46,15 +46,15 @@ namespace avplus
         public void Send(CrestronDevice dev, string msg)
         {
             byte[] b = Encoding.Default.GetBytes(msg);
-            //Debug("SendSocket: " + Utils.createHexPrintableString(b));
+            Debug("SendSocket: " + Utils.createHexPrintableString(b));
             foreach (Connection cl in dev.connections)
                 if (cl.ClientSocket.Connected)
                     cl.ClientSocket.Send(b);
         }
 
-        public void Send(byte ipid, string msg)
+        public CrestronDevice GetCrestronDevice(byte ipid)
         {
-            Send(uis.Find(x => x.id == ipid), msg);
+            return uis.Find(x => x.id == ipid);
         }
 
         #region button_events
@@ -177,40 +177,26 @@ namespace avplus
         }
         public void SendSerialSmartObject(CrestronDevice device, ushort id, ushort idx, string val)
         {
-            //\x12\x00\x14\x00\x00\x00\x10\x39\x00\x00\x00\x02\x00\x09\x34\x00\x03hello // "hello" join 1
-            //\x12\x00\x14\x00\x00\x00\x10\x39\x00\x00\x00\x02\x00\x09\x34\x00\x01\x0301234 // "01234" join 2
             byte[] bLen1 = { (byte)(val.Length + 15) };
             byte[] bLen2 = { (byte)(val.Length + 11) };
             byte[] bLen3 = { (byte)(val.Length + 4) };
             byte[] bId   = { (byte)(id) };
             byte[] bVal  = Encoding.Default.GetBytes(val);
-            byte[] bIdx = { (byte)((idx-1) / 0x100), (byte)((idx-1) % 0x100) };
+            byte[] bIdx = { (byte)((idx+9) / 0x100), (byte)((idx+9) % 0x100) };
             string sIdx = Encoding.Default.GetString(bIdx);
-            /*
-            string sIdx = "";
-            if (idx == 1)
-            {
-                byte[] bIdx = { (byte)(idx - 1) };
-                sIdx = Encoding.Default.GetString(bIdx);
-            }
-            else
-            {
-                byte[] bIdx = { (byte)(idx / 0x100), (byte)(idx % 0x100) };
-                sIdx = Encoding.Default.GetString(bIdx);
-            }
-             */
-
             string str = "\x12\x00"
                 + Encoding.Default.GetString(bLen1)
                 + "\x00\x00\x00"
                 + Encoding.Default.GetString(bLen2)
-                + "\x39\x00\x00\x00\x02\x00"
+                + "\x39\x00\x00\x00"
+                + Encoding.Default.GetString(bId)
+                + "\x00"
                 + Encoding.Default.GetString(bLen3)
                 + "\x34"
                 + sIdx
-                + Encoding.Default.GetString(bId)
+                + "\x03"
                 + Encoding.Default.GetString(bVal);
-            Debug("SendSerialSmartObject: " + Utils.createHexPrintableString(str));
+            //Debug("SendSerialSmartObject: " + Utils.createHexPrintableString(str));
             Send(device, str);
         }
         public void SendDigitalSmartObject(CrestronDevice device, byte id, ushort idx, bool val)

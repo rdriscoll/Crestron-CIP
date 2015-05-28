@@ -34,8 +34,8 @@ namespace avplus
 
         public static string createBytesFromHexString(string str)
         {
-            String p1 = @"((\\x\d{2})|(.))";
-            String p2 = @"\\x(\d{2})";
+            String p1 = @"(\\[xX][0-9a-fA-F]{2}|.)";
+            String p2 = @"\\x([xX][0-9a-fA-F]{2})";
             Regex r1 = new Regex(p1);
             //Regex r2 = new Regex(p2);
             MatchCollection m = r1.Matches(str);
@@ -46,9 +46,7 @@ namespace avplus
                 if (m1.Value.IndexOf("\\x") > -1)
                 {
                     string s3 = m1.Value.Remove(0, 2);
-                    //int i2 = Int32.Parse(s3, System.Globalization.NumberStyles.HexNumber);
                     byte b2 = Byte.Parse(s3, System.Globalization.NumberStyles.HexNumber);
-                    //byte[] b1 = Encoding.Default.GetBytes(i2);
                     s1 = s1 + Encoding.Default.GetString(new byte[]{ b2 });
                 }
                 else

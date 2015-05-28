@@ -84,7 +84,8 @@ namespace avplus
             //Crestron.SendSerial(devices[1], 1, tbSer.Text);
             //Crestron.SendSerialSmartObject(device, 3, 1, tbSer.Text);
             string s = Utils.createBytesFromHexString(tbSer.Text);
-            Crestron.Send(0x03, s);
+            //Crestron.SendSerialSmartObject(Crestron.GetCrestronDevice(0x03), 3, 1, s);
+            Crestron.Send(Crestron.GetCrestronDevice(0x03), s);
         }
 
         private void numericUpDown1_ValueChanged(object sender, EventArgs e)

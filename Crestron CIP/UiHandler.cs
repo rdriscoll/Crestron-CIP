@@ -77,12 +77,12 @@ namespace avplus
                     }
                     break;
                 }
-                case SMART_LIST:
+                //case SMART_LIST: // smart ser idx starts at \x0A
+                default:
                 {
                     if (val) // press
                     {
-                        parent.SendSerialSmartObject(device, SMART_LIST, (ushort)(idx - 10), "ITEM " + (idx - 10).ToString());
-                        parent.SendSerialSmartObject(device, SMART_LIST, (ushort)1, "ITEM 1");
+                        parent.SendSerialSmartObject(device, smartId, (ushort)(idx - 10), "ITEM " + (idx - 10).ToString());
                     }
                     break;
                 }
