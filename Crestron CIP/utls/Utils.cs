@@ -16,6 +16,31 @@ namespace avplus
             return bytes;
         }
 
+        public static string createAsciiPrintableString(byte[] bArgs)
+        {
+            string strOut_ = "";
+            byte[] b = Encoding.Default.GetBytes(" ~");
+            foreach (byte bIndex_ in bArgs)
+            {
+                if (bIndex_ >= b[0] && bIndex_ <= b[1]) // ASCII
+                {
+                    //strOut_ += String.Format("{0,4}", bIndex_);
+                    strOut_ += Encoding.ASCII.GetString(new byte[] { bIndex_ });
+                }
+                else
+                {
+                    string sHexOutput_ = String.Format("{0:X}", bIndex_);
+                    strOut_ += @"\x" + String.Format("{0:X}", sHexOutput_).PadLeft(2, '0');
+                }
+            }
+            return strOut_;
+        }
+        public static string createAsciiPrintableString(string str)
+        {
+            byte[] b = Encoding.Default.GetBytes(str);
+            return createAsciiPrintableString(b);
+        }
+
         public static string createHexPrintableString(byte[] bArgs)
         {
             string strOut_ = "";
@@ -85,7 +110,6 @@ namespace avplus
             String m = Regex.Match(strArg, @"\d+").Value;
             return (m.Length == 0 ? 0 : Convert.ToInt32(m));
         }
-
 
         public static int convertRanges(int val, int inMin, int inMax, int outMin, int outMax)
         {

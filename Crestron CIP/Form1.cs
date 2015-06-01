@@ -75,22 +75,25 @@ namespace avplus
 
         private void btnDig_Click(object sender, EventArgs e)
         {
-            Crestron.ToggleDigital(device, 1);
+            Crestron.ToggleDigital(Crestron.GetCrestronDevice(0x03), (ushort)numericUpDown1.Value);
             //Crestron.SendDigitalSmartObject(3,1,true);
         }
 
         private void tbSer_TextChanged(object sender, EventArgs e)
         {
-            //Crestron.SendSerial(devices[1], 1, tbSer.Text);
+            //Crestron.SendSerial(Crestron.GetCrestronDevice(0x03), 2, tbSer.Text);
+            Crestron.SendSerial(Crestron.GetCrestronDevice(0x03), 2, tbSer.Text);
+            //Crestron.SendSerial(Crestron.GetCrestronDevice(0x03), 3, tbSer.Text);
             //Crestron.SendSerialSmartObject(device, 3, 1, tbSer.Text);
             string s = Utils.createBytesFromHexString(tbSer.Text);
             //Crestron.SendSerialSmartObject(Crestron.GetCrestronDevice(0x03), 3, 1, s);
-            Crestron.Send(Crestron.GetCrestronDevice(0x03), s);
+            //Crestron.Send(Crestron.GetCrestronDevice(0x03), s);
         }
 
         private void numericUpDown1_ValueChanged(object sender, EventArgs e)
         {
-            Crestron.SendAnaloguePercent(device, 1, (byte)numericUpDown1.Value);
+            //Crestron.SendAnaloguePercent(Crestron.GetCrestronDevice(0x03), 1, (byte)numericUpDown1.Value);
+            Crestron.SendAnalogue(Crestron.GetCrestronDevice(0x03), 1, (byte)numericUpDown1.Value);
         }
         #endregion
 
