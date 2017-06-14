@@ -1,6 +1,6 @@
 ﻿// License info and recommendations
 //-----------------------------------------------------------------------
-// <copyright file="Program.cs" company="AVPlus Integration Pty Ltd">
+// <copyright file="ConnectionList.cs" company="AVPlus Integration Pty Ltd">
 //     {c} AV Plus Pty Ltd 2017.
 //     http://www.avplus.net.au
 //     20170611 Rod Driscoll
@@ -28,22 +28,52 @@
 //      of the project source code;
 // </copyright>
 
-namespace AVPlus.CrestronCIP
+namespace AVPlus.sockets
 {
-    using System;
-    using System.Windows.Forms;
-
-    static class Program
+    public class ConnectionList : System.Collections.CollectionBase
     {
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
-        [STAThread]
-        static void Main()
+        public ConnectionList()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new ClientForm());
+        }
+
+        public void Add(Connection value)
+        {
+            List.Add(value);
+        }
+
+        public void Remove(Connection value)
+        {
+            List.Remove(value);
+        }
+
+        public bool Contains(Connection value)
+        {
+            return (List.Contains(value));
+        }
+
+        public Connection this[int index]
+        {
+            get
+            {
+                return List[index] as Connection;
+            }
+            set
+            {
+                List[index] = value;
+            }
+        }
+
+        public Connection this[string connectionName]
+        {
+            get
+            {
+                foreach (Connection connection in List)
+                {
+                    if (connection.ConnectionName == connectionName)
+                        return connection;
+                }
+                return null;
+            }
         }
     }
 }

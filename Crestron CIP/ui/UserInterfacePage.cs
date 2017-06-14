@@ -1,6 +1,6 @@
 ﻿// License info and recommendations
 //-----------------------------------------------------------------------
-// <copyright file="Program.cs" company="AVPlus Integration Pty Ltd">
+// <copyright file="UserInterfacePage.cs" company="AVPlus Integration Pty Ltd">
 //     {c} AV Plus Pty Ltd 2017.
 //     http://www.avplus.net.au
 //     20170611 Rod Driscoll
@@ -30,20 +30,27 @@
 
 namespace AVPlus.CrestronCIP
 {
-    using System;
-    using System.Windows.Forms;
+    using System.Collections.Generic;
 
-    static class Program
+    public class UserInterfacePage
     {
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
-        [STAThread]
-        static void Main()
+        public ushort join;
+        public string name;
+        public string label;
+        public UserInterfacePage parentPage;
+        public UserInterfacePage lastPage;
+        public Dictionary<ushort, UserInterfacePage> MainList = new Dictionary<ushort, UserInterfacePage>();
+        public Dictionary<ushort, UserInterfacePage> TopList = new Dictionary<ushort, UserInterfacePage>();
+        public Dictionary<ushort, UserInterfacePage> Links = new Dictionary<ushort, UserInterfacePage>();
+        public UserInterfacePage()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new ClientForm());
+            //this.name = name;
+        }
+
+        public void SetMainList(Dictionary<ushort, UserInterfacePage> pages)
+        {
+            this.MainList = pages;
         }
     }
+
 }

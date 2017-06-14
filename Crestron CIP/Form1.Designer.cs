@@ -1,4 +1,4 @@
-﻿namespace avplus
+﻿namespace AVPlus.CrestronCIP
 {
     partial class ClientForm
     {

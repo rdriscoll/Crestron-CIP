@@ -1,21 +1,48 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using avplus;
-using avplus.sockets;
-using System.Text.RegularExpressions;
+﻿// License info and recommendations
+//-----------------------------------------------------------------------
+// <copyright file="Crestron_CIP_Server.cs" company="AVPlus Integration Pty Ltd">
+//     {c} AV Plus Pty Ltd 2017.
+//     http://www.avplus.net.au
+//     20170611 Rod Driscoll
+//     e: rdriscoll@avplus.net.au
+//     m: +61 428 969 608
+//     Permission is hereby granted, free of charge, to any person obtaining a copy
+//     of this software and associated documentation files (the "Software"), to deal
+//     in the Software without restriction, including without limitation the rights
+//     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//     copies of the Software, and to permit persons to whom the Software is
+//     furnished to do so, subject to the following conditions:
+//     
+//     The above copyright notice and this permission notice shall be included in
+//     all copies or substantial portions of the Software.
+//     
+//     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+//     THE SOFTWARE.
+//
+//     For more details please refer to the LICENSE file located in the root folder 
+//      of the project source code;
+// </copyright>
 
-namespace avplus
+namespace AVPlus.CrestronCIP
 {
-    class Crestron_CIP_Server : SocketServer
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Text;
+    using System.Threading;
+    using System.Text.RegularExpressions;
+    using AVPlus.sockets;
+
+    public class Crestron_CIP_Server : SocketServer
     {
-        //public List<CrestronDevice> devices = new List<CrestronDevice>();
-        public CrestronDevice ui_01;
-        public CrestronDevice ui_02;
-        public CrestronDevice ui_03;
-        UiHandler uiHandler;
+        public event EventHandler<SerialEventArgs> SetSerial;
+
+        AUserInterfaceEvents uiHandler = new TestView2();
         List<CrestronDevice> uis = new List<CrestronDevice>();
 
         private bool tempBool;
@@ -23,32 +50,48 @@ namespace avplus
         const int PORT_CIP = 41794;
         private Object _bufferLock = new Object();
 
-        public Crestron_CIP_Server(ClientForm myForm)
-            : base(myForm, PORT_CIP)
+        public Crestron_CIP_Server()
         {
-            uiHandler = new UiHandler(this);
-            Console.WriteLine("Crestron_CIP_Server created");
-            ui_01 = new CrestronDevice(0x04, this);
-            ui_02 = new CrestronDevice(0x05, this);
-            ui_03 = new CrestronDevice(0x06, this);
+            OnDebug(eDebugEventType.Info, "Crestron_CIP_Server created");
 
-            uis.Add(ui_01);
-            uis.Add(ui_02);
-            uis.Add(ui_03);
+            uiHandler.PulseDigital  += new EventHandler<AnalogEventArgs> (uiHandler_PulseDigital);
+            uiHandler.ToggleDigital += new EventHandler<DigitalEventArgs>(uiHandler_ToggleDigital);
+            uiHandler.SetDigital    += new EventHandler<DigitalEventArgs>(uiHandler_SetDigital);
+            uiHandler.SetAnalog     += new EventHandler<AnalogEventArgs> (uiHandler_SetAnalog);
+            uiHandler.SetSerial     += new EventHandler<SerialEventArgs> (uiHandler_SetSerial);
+            
+            uiHandler.PulseDigitalSmartObject  += new EventHandler<AnalogSmartObjectEventArgs> (uiHandler_PulseDigitalSmartObject);
+            uiHandler.ToggleDigitalSmartObject += new EventHandler<DigitalSmartObjectEventArgs>(uiHandler_ToggleDigitalSmartObject);
+            uiHandler.SetDigitalSmartObject    += new EventHandler<DigitalSmartObjectEventArgs>(uiHandler_SetDigitalSmartObject);
+            uiHandler.SetAnalogSmartObject     += new EventHandler<AnalogSmartObjectEventArgs> (uiHandler_SetAnalogSmartObject);
+            uiHandler.SetSerialSmartObject     += new EventHandler<SerialSmartObjectEventArgs> (uiHandler_SetSerialSmartObject);
+
+            uiHandler.Debug += new EventHandler<StringEventArgs>(uiHandler_Debug);
+
+            uis.Add(new CrestronDevice(0x03, this));
+            uis.Add(new CrestronDevice(0x04, this));
+            uis.Add(new CrestronDevice(0x05, this));
         }
 
+        protected void uiHandler_Debug(object sender, StringEventArgs e)
+        {
+            OnDebug(eDebugEventType.Info, e.val);
+        }
         public void StartServer()
         {
             StartServer(PORT_CIP);
         }
 
-        public void Send(CrestronDevice dev, string msg)
+        public void Send(CrestronDevice dev, byte[] msg)
         {
-            byte[] b = Encoding.Default.GetBytes(msg);
-            //Debug("SendSocket: " + Utils.createHexPrintableString(b));
+            //OnDebug(eDebugEventType.Info, "SendSocket: " + StringHelper.CreateHexPrintableString(b));
             foreach (Connection cl in dev.connections)
                 if (cl.ClientSocket.Connected)
-                    cl.ClientSocket.Send(b);
+                    cl.ClientSocket.Send(msg);
+        }
+        public void Send(CrestronDevice dev, string msg)
+        {
+            Send(dev, StringHelper.GetBytes(msg));
         }
 
         public CrestronDevice GetCrestronDevice(byte ipid)
@@ -56,40 +99,47 @@ namespace avplus
             return uis.Find(x => x.id == ipid);
         }
 
-        #region button_events
-        public void DigitalEventIn(CrestronDevice device, ushort idx, bool val)
+        #region button feedback events from program
+
+        public void DigitalEventIn (CrestronDevice device, ushort idx, bool val)
         {
-            //Debug(String.Format("Digital[{0}]: {1}", idx, val));
-            //UiWithMeta ui = uis.Find(x => x.id == id);
+            //OnDebug(eDebugEventType.Info, "Digital[{0}]: {1}", idx.ToString(), val.ToString());
             uiHandler.DigitalEventIn(device, idx, val);
         }
-        public void AnalogueEventIn(CrestronDevice device, ushort idx, ushort val)
+        public void AnalogEventIn  (CrestronDevice device, ushort idx, ushort val)
         {
-            Debug(String.Format("Analogue[{0}]: {1}", idx, val));
+            OnDebug(eDebugEventType.Info, "Analogue[{0}]: {1}", idx.ToString(), val.ToString());
+            uiHandler.AnalogEventIn(device, idx, val);
         }
-        public void SerialEventIn(CrestronDevice device, ushort idx, string val)
+        public void SerialEventIn  (CrestronDevice device, ushort idx, string val)
         {
-            //Debug(String.Format("String[{0}]: {1}", idx, val));
-            parent.Invoke(parent.serFb, new Object[] { idx, val });
+            OnDebug(eDebugEventType.Info, "Serial[{0}]: {1}", idx.ToString(), val);
+            uiHandler.SerialEventIn(device, idx, val);
         }
 
-        public void DigitalSmartObjectEventIn(CrestronDevice device, byte smartId, ushort idx, bool val)
+        public void OnSetSerial(SerialEventArgs args)
         {
-            Debug(String.Format("IPID {0} SmartObject ID {1} Digital[{2}]:{3}", device.id, smartId, idx, val));
-            uiHandler.DigitalSmartObjectEventIn(device, smartId, idx, val);
+            if (SetSerial != null)
+                SetSerial(this, args);
         }
-        public void AnalogueSmartObjectEventIn(CrestronDevice device, byte smartId, ushort idx, ushort val)
+
+        public void DigitalSmartObjectEventIn (CrestronDevice device, byte id, ushort idx, bool val)
         {
-            Debug(String.Format("SmartObject {0} Analogue[{1}]: {2}", smartId, idx, val));
+            //OnDebug(eDebugEventType.Info, "IPID {0} SmartObject ID {1} Digital[{2}]:{3}", device.id, id, idx, val);
+            uiHandler.DigitalSmartObjectEventIn(device, id, idx, val);
         }
-        public void SerialSmartObjectEventIn(CrestronDevice device, byte smartId, ushort idx, string val)
+        public void AnalogueSmartObjectEventIn(CrestronDevice device, byte id, ushort idx, ushort val)
         {
-            Debug(String.Format("SmartObject {0} String[{1}]: {2}", smartId, idx, val));
+            OnDebug(eDebugEventType.Info, "SmartObject {0} Analogue[{1}]: {2}", id.ToString(), idx.ToString(), val.ToString());
+        }
+        public void SerialSmartObjectEventIn  (CrestronDevice device, byte id, ushort idx, string val)
+        {
+            OnDebug(eDebugEventType.Info, "SmartObject {0} String[{1}]: {2}", id.ToString(), idx.ToString(), val);
         }
 
         public void DeviceSignIn(CrestronDevice device)
         {
-            Debug("Sign on IPID: " + device.id.ToString());
+            OnDebug(eDebugEventType.Info, "Sign on IPID: " + device.id.ToString());
             string sMsg_ = "\x02\x00\x04\x00\x00\x00\x03"; // accept connection
             Send(device, sMsg_);
             uiHandler.DeviceSignIn(device);
@@ -115,15 +165,57 @@ namespace avplus
 
         #endregion
 
-        #region string_parsing
+        #region button press events from ui
 
-        public void SendDigital(CrestronDevice device, ushort idx, bool val)
+        void uiHandler_PulseDigital (object sender, AnalogEventArgs e)
         {
-            ushort NewIdx = (ushort)Utils.SetBit(idx - 1, 15, !val);
+            PulseDigital(e.device, e.join, e.val);
+        }
+        void uiHandler_SetDigital   (object sender, DigitalEventArgs e)
+        {
+            SendDigital(e.device, e.join, e.val);
+        }
+        void uiHandler_ToggleDigital(object sender, DigitalEventArgs e)
+        {
+            ToggleDigital(e.device,e.join);
+        }
+        void uiHandler_SetAnalog    (object sender, AnalogEventArgs e)
+        {
+            SendAnalogue(e.device, e.join, e.val);
+        }
+        void uiHandler_SetSerial    (object sender, SerialEventArgs e)
+        {
+            SendSerial(e.device, e.join, e.val);
+        }
+
+        void uiHandler_PulseDigitalSmartObject (object sender, AnalogSmartObjectEventArgs e)
+        {
+            PulseDigitalSmartObject(e.device, e.id, e.join, e.val);
+        }
+        void uiHandler_SetDigitalSmartObject   (object sender, DigitalSmartObjectEventArgs e)
+        {
+            SendDigitalSmartObject(e.device, e.id, e.join, e.val);
+        }
+        void uiHandler_ToggleDigitalSmartObject(object sender, DigitalSmartObjectEventArgs e)
+        {
+            ToggleDigitalSmartObject(e.device, e.id, e.join);           
+        }
+        void uiHandler_SetAnalogSmartObject    (object sender, AnalogSmartObjectEventArgs e)
+        {
+            SendAnalogSmartObject(e.device, e.id, e.join, e.val);
+        }
+        void uiHandler_SetSerialSmartObject    (object sender, SerialSmartObjectEventArgs e)
+        {
+            SendSerialSmartObject(e.device, e.id, e.join, e.val);
+        }
+
+        public void SendDigital (CrestronDevice device, ushort idx, bool val)
+        {
+            ushort NewIdx = (ushort)StringHelper.SetBit(idx - 1, 15, !val);
             byte[] b = { (byte)(NewIdx % 0x100), (byte)(NewIdx / 0x100) };
-            string str = "\x05\x00\x06\x00\x00\x03\x00" + Encoding.Default.GetString(b);
+            string str = "\x05\x00\x06\x00\x00\x03\x00" + StringHelper.GetString(b);
             Send(device, str);
-            //Debug("SendDigital: " + Utils.createHexPrintableString(str));
+            //Debug("SendDigital: " + StringHelper.CreateHexPrintableString(str));
             // local feedback
             if (device.digitals.Where(x => x.pos == idx).Count() == 0)
                 device.digitals.Add(new Digital(idx, false));
@@ -139,20 +231,20 @@ namespace avplus
             if (idxHighByte == 0)
             {
                 byte[] b = { idxLowByte, LevelHighByte, LevelLowByte };
-                string s = Encoding.Default.GetString(b);
+                string s = StringHelper.GetString(b);
                 string str = "\x05\x00\x07\x00\x00\x04\x01" + s;
-                //Debug("SendCrestron: " + Utils.createHexPrintableString(str));
+                //Debug("SendCrestron: " + StringHelper.CreateHexPrintableString(str));
                 Send(device, str);
             }
             else
             {
                 byte[] b = { idxHighByte, idxLowByte, LevelHighByte, LevelLowByte };
-                string s = Encoding.Default.GetString(b);
+                string s = StringHelper.GetString(b);
                 string str = "\x05\x00\x08\x00\x00\x05\x01" + s;
                 Send(device, str);
             }
         }
-        public void SendSerial(CrestronDevice device, ushort idx, string val)
+        public void SendSerial  (CrestronDevice device, ushort idx, string val)
         {
             string str = "";
             if (val.Length < 7)
@@ -161,11 +253,11 @@ namespace avplus
                 byte[] b2 = { (byte)((idx - 1) / 0x100), (byte)((idx - 1) % 0x100) };
                 byte[] b3 = Encoding.Default.GetBytes(val);
                 str = "\x05\x00"
-                    + Encoding.Default.GetString(b1)
+                    + StringHelper.GetString(b1)
                     + "\x00\x00\x09\x15"
-                    + Encoding.Default.GetString(b2)
+                    + StringHelper.GetString(b2)
                     + "\x03"
-                    + Encoding.Default.GetString(b3);
+                    + StringHelper.GetString(b3);
             }
             else
             {
@@ -175,14 +267,14 @@ namespace avplus
                 byte[] b3 = { (byte)((idx - 1) / 0x100), (byte)((idx - 1) % 0x100) };
                 byte[] b4 = Encoding.Default.GetBytes(val);
                 str = "\x12\x00"
-                   + Encoding.Default.GetString(b1)
+                   + StringHelper.GetString(b1)
                    + "\x00\x00\x00"
-                   + Encoding.Default.GetString(b2)
+                   + StringHelper.GetString(b2)
                    + "\x34"
-                   + Encoding.Default.GetString(b3)
+                   + StringHelper.GetString(b3)
                    + "\x03"
-                   + Encoding.Default.GetString(b4);
-                  //Debug("SendSerial: " + Utils.createHexPrintableString(str.Substring(0, 11)) + Utils.createAsciiPrintableString(str.Substring(11, str.Length-11)));
+                   + StringHelper.GetString(b4);
+                  //Debug("SendSerial: " + StringHelper.CreateHexPrintableString(str.Substring(0, 11)) + StringHelper.CreateAsciiPrintableString(str.Substring(11, str.Length-11)));
             }
             Send(device, str);
         }
@@ -195,86 +287,113 @@ namespace avplus
             foreach (Digital d in query)
                 SendDigital(device, idx, !d.value);
         }
+        public void ToggleDigitalSmartObject(CrestronDevice device, byte id, ushort idx)
+        {
+            OnDebug(eDebugEventType.Info, "ToggleDigitalSmartObject:{0}:{1} ",id, idx);
+            CrestronJoins smartObject = device.smartObjects.Find(x => x.id == id);
+            if (smartObject == null)
+            {
+                smartObject = new CrestronJoins(id);
+                device.smartObjects.Add(smartObject);
+            }
+            Digital dig = smartObject.digitals.Find(x => x.pos == idx);
+            if (dig == null)
+            {
+                dig = new Digital(idx, false);
+                device.smartObjects.Add(smartObject);
+            }
+            SendDigitalSmartObject(device, id, idx, !dig.value);
+        }
         public void PulseDigital(CrestronDevice device, ushort idx, int msec)
         {
             SendDigital(device, idx, false);
             AddToWaitQueue(device, idx, true, msec);
         }
-        public void SendAnaloguePercent(CrestronDevice device, ushort idx, byte val)
+        public void SendAnalogPercent      (CrestronDevice device, ushort idx, byte val)
         {
-            SendAnalogue(device, idx, (ushort)Utils.convertRanges(val, 0, 100, 0, 0xFFFF));
+            SendAnalogue(device, idx, (ushort)StringHelper.ConvertRanges(val, 0, 100, 0, 0xFFFF));
         }
-        public void SendSerialUnicode(CrestronDevice device, ushort idx, string val)
+        public void SendSerialUnicode      (CrestronDevice device, ushort idx, string val)
         {
             //\x12\x00\x0A\x00\x00\x00\x06\x34\x00\x00\x07\x31\x00 // "1"
             //\x12\x00\x0C\x00\x00\x00\x08\x34\x00\x00\x07\x31\x00\x31\x00\x31\x00 // "111"
             byte[] b1 = { (byte)(val.Length + 9) };
             byte[] b2 = { (byte)(val.Length + 5) };
             byte[] b3 = { (byte)((idx - 1) / 0x100), (byte)((idx - 1) % 0x100) };
-            byte[] b4 = Encoding.Unicode.GetBytes(val);
+            byte[] b4 = Encoding.GetEncoding("ISO-8859-1").GetBytes(val);
             string str = "\x12\x00"
-                + Encoding.Default.GetString(b1)
+                + StringHelper.GetString(b1)
                 + "\x00\x00\x00"
-                + Encoding.Default.GetString(b2)
+                + StringHelper.GetString(b2)
                 + "\x34"
-                + Encoding.Default.GetString(b3)
+                + StringHelper.GetString(b3)
                 + "\x07"
-                + Encoding.Default.GetString(b4);
+                + StringHelper.GetString(b4);
             Send(device, str);
         }
-        public void SendSerialSmartObject(CrestronDevice device, ushort id, byte idx, string val)
+        public void SendSerialSmartObject  (CrestronDevice device, byte id, ushort idx, string val)
         {
             byte[] bLen1 = { (byte)(val.Length + 15) };
             byte[] bLen2 = { (byte)(val.Length + 11) };
             byte[] bLen3 = { (byte)(val.Length + 4) };
             byte[] bId   = { (byte)(id) };
             byte[] bVal  = Encoding.Default.GetBytes(val);
-            byte[] bIdx = { (byte)((idx+9) / 0x100), (byte)((idx+9) % 0x100) };
-            string sIdx = Encoding.Default.GetString(bIdx);
+            byte[] bIdx = { (byte)((idx) / 0x100), (byte)((idx) % 0x100) };
+            string sIdx = StringHelper.GetString(bIdx);
             string str = "\x12\x00"
-                + Encoding.Default.GetString(bLen1)
+                + StringHelper.GetString(bLen1)
                 + "\x00\x00\x00"
-                + Encoding.Default.GetString(bLen2)
+                + StringHelper.GetString(bLen2)
                 + "\x39\x00\x00\x00"
-                + Encoding.Default.GetString(bId)
+                + StringHelper.GetString(bId)
                 + "\x00"
-                + Encoding.Default.GetString(bLen3)
+                + StringHelper.GetString(bLen3)
                 + "\x34"
-                + sIdx
+                + sIdx 
                 + "\x03"
-                + Encoding.Default.GetString(bVal);
-            //Debug("SendSerialSmartObject: " + Utils.createHexPrintableString(str));
+                + StringHelper.GetString(bVal);
+            //Debug("SendSerialSmartObject: " + StringHelper.CreateHexPrintableString(str));
             Send(device, str);
         }
-        public void SendDigitalSmartObject(CrestronDevice device, byte id, byte idx, bool val)
+        public void SendDigitalSmartObject (CrestronDevice device, byte id, ushort idx, bool val)
         {
             tempBool = !tempBool;
             // \x05\x00\x0C\x00\x00\x09\x38\x00\x00\x00\x03\x03\x27\x00\x00 // id 3, press 1
             // \x05\x00\x0C\x00\x00\x09\x38\x00\x00\x00\x03\x03\x27\x01\x80 // id 3, release 2
             byte[] b1 = { (byte)id };
-            ushort NewIdx = (ushort)Utils.SetBit(idx - 1, 15, tempBool);
+            ushort NewIdx = (ushort)StringHelper.SetBit(idx - 1, 15, tempBool);
             byte[] b2 = { (byte)(NewIdx % 0x100), (byte)(NewIdx / 0x100) };
             string str = "\x05\x00\x0C\x00\x00\x09\x38\x00\x00\x00"
-                + Encoding.Default.GetString(b1)
-                + "\x03\x27"
-                + Encoding.Default.GetString(b2);
+                + StringHelper.GetString(b1)
+                + "\x03\x00" //"\x03\x27"
+                + StringHelper.GetString(b2);
+            OnDebug(eDebugEventType.Info, "SendDigitalSmartObject: " + StringHelper.CreateHexPrintableString(str));
             Send(device, str);
         }
-        public void SendAnalogueSmartObject(CrestronDevice device, byte id, byte idx, ushort val)
+        public void PulseDigitalSmartObject(CrestronDevice device, byte id, ushort idx, int msec)
+        {
+            SendDigitalSmartObject(device, id, (byte)idx, false);
+            AddToWaitQueue(device, id, idx, true, msec);
+        }
+        public void SendAnalogSmartObject  (CrestronDevice device, byte id, ushort idx, ushort val)
         {
             // \x05\x00\x0E\x00\x00\x0B\x38\x00\x00\x00\x03\x05\x14\x00\x03\x00\x03 // id 3 analog setNumItems(idx 3) val 3
             // \x05\x00\x0E\x00\x00\x0B\x38\x00\x00\x00\x05\x05\x14\x00\x0a\x00\x09 // id 5 analog setItem1IconAna(idx 11) val 9
             byte[] b1 = { (byte)id };
-            ushort NewIdx = (ushort)Utils.SetBit(idx - 1, 15, tempBool);
+            ushort NewIdx = (ushort)StringHelper.SetBit(idx - 1, 15, tempBool);
             byte[] b2 = { (byte)idx };
             byte[] b3 = { (byte)(val / 0x100), (byte)(val % 0x100) };
             string str = "\x05\x00\x0E\x00\x00\x0B\x38\x00\x00\x00"
-                + Encoding.Default.GetString(b1)
+                + StringHelper.GetString(b1)
                 + "\x05\x14\x00"
-                + Encoding.Default.GetString(b2)
-                + Encoding.Default.GetString(b3);
+                + StringHelper.GetString(b2)
+                + StringHelper.GetString(b3);
             Send(device, str);
         }
+
+        #endregion
+        
+        #region string_parsing
 
         public void ParseDeviceDetails(Connection c, byte[] b1)
         {
@@ -283,8 +402,8 @@ namespace avplus
             {
                 if (b1[7] == 0x30) // run time status
                 {
-                    string s = Utils.createAsciiPrintableString(b1.Skip(11).Take(b1.Length - 11).ToArray());
-                    Debug("status: " + s);
+                    string s = StringHelper.CreateAsciiPrintableString(b1.Skip(11).Take(b1.Length - 11).ToArray());
+                    OnDebug(eDebugEventType.Info, "status: " + s);
                     Match m;
                     m = new Regex(@"Core3Version.(.+)").Match(s);
                     if (m.Success)
@@ -300,7 +419,7 @@ namespace avplus
                 }
                 else // if (b1[7] == 0x31) // device status
                 {
-                    Debug("details: " + Utils.createAsciiPrintableString(b1.Skip(16).Take(b1.Length - 16).ToArray()));
+                    OnDebug(eDebugEventType.Info, "details: " + StringHelper.CreateAsciiPrintableString(b1.Skip(16).Take(b1.Length - 16).ToArray()));
                 }
                 #region device detail strings
                 /*
@@ -342,26 +461,39 @@ namespace avplus
             else // sending details
             {
                 // \x05\x00\x05\x00\x00\x02\x03\x00 // sent on connection
-                Debug("ParseCrestron sending details: " + Utils.createHexPrintableString(b1));
+                OnDebug(eDebugEventType.Info, "ParseCrestron sending details: " + StringHelper.CreateHexPrintableString(b1));
             }
         }
 
         public void ParseSerialUnicodeEvent(Connection c, byte[] b1)
         {
-            Debug("ParseCrestron Serial unicode: " + Utils.createHexPrintableString(b1));
+            OnDebug(eDebugEventType.Info, "ParseCrestron Serial unicode: " + StringHelper.CreateHexPrintableString(b1));
             CrestronDevice dev = uis.Find(x => x.connections.Contains(c));
-            ushort idx = (ushort)(b1[8] * 0x100 + b1[9] + 1);
             //\x12\x00\x0A\x00\x00\x00\x06\x34\x00\x00\x07\x31\x00 // "1"
             //\x12\x00\x0C\x00\x00\x00\x08\x34\x00\x00\x07\x31\x00\x31\x00\x31\x00 // "111"
             //String str = "";
             //for (int i=11; i<b1.Length; i+=2)
-            //    str = str + Encoding.Default.GetString(b1, i, 1);
-            String str = Encoding.Unicode.GetString(b1, 11, b1.Length-11);
-            SerialEventIn(dev, idx, str);
+            //    str = str + StringHelper.GetString(b1, i, 1);
+            ushort idx = 0;
+            String str = String.Empty;
+            switch (b1[7])
+            {
+                case 0x39: // smart object
+                    idx = (ushort)(b1[ 8] * 0x100 + b1[ 9] + 1);
+                    byte id  = (byte)(b1[10] * 0x100 + b1[11] + 1);
+                    str = Encoding.GetEncoding("ISO-8859-1").GetString(b1, 18, b1.Length - 18);
+                    SerialSmartObjectEventIn(dev, id, idx, str);
+                    break;
+                default:
+                    idx = (ushort)(b1[8] * 0x100 + b1[9] + 1);
+                    str = Encoding.GetEncoding("ISO-8859-1").GetString(b1, 11, b1.Length-11);
+                    SerialEventIn(dev, idx, str);
+                    break;
+            };
         }
         public void ParseJoinEvent(Connection c, byte[] b1)
         {
-            //Debug("Join event");
+            //OnDebug(eDebugEventType.Info, "Join event");
             CrestronDevice dev = uis.Find(x => x.connections.Contains(c));
             switch (b1[6]) 
             {
@@ -369,24 +501,24 @@ namespace avplus
                 case 0x27: // digital
                 { 
                     ushort idx = (ushort)((b1[8] & 0x7F) * 0x100 + b1[7] + 1);
-                    // Debug("ParseCrestron Digital: " + Utils.createHexPrintableString(b1));
-                    bool val = !Utils.GetBit(b1[8], 7);
+                    //OnDebug(eDebugEventType.Info, "ParseCrestron Digital: " + StringHelper.CreateHexPrintableString(b1));
+                    bool val = !StringHelper.GetBit(b1[8], 7);
                     DigitalEventIn(dev, idx, val);
                     break;
                 }
                 case 0x01:
                 case 0x14:  // analogue
                 {
-                    Debug("ParseCrestron Analogue: " + Utils.createHexPrintableString(b1));
+                    //OnDebug(eDebugEventType.Info, "ParseCrestron Analogue: " + StringHelper.CreateHexPrintableString(b1));
                     ushort idx = (ushort)(b1[7] * 0x100 + b1[8] + 1);
                     ushort val = (ushort)(b1[9] * 0x100 + b1[10]);
-                    AnalogueEventIn(dev, idx, val);
+                    AnalogEventIn(dev, idx, val);
                     break;
                 }
                 case 0x02: // serial type 1
                 {
-                    Debug("ParseCrestron Serial Type 1: " + Utils.createHexPrintableString(b1));
-                    string str = Encoding.Default.GetString(b1);
+                    OnDebug(eDebugEventType.Info, "ParseCrestron Serial Type 1: " + StringHelper.CreateHexPrintableString(b1));
+                    string str = StringHelper.GetString(b1);
                     // "$05,$00,$0F,$00,$00,$0C,$02,'#1,',$0D,'#1,aaa',$0D" = ser 1 to aaa
                     Match m = Regex.Match(str, @".*#(.*),.*#.*,(.*)\x0D");
                     if (m.Groups.Count < 2)
@@ -400,16 +532,16 @@ namespace avplus
                 case 0x03: { ParseDeviceDetails(c, b1); break; } // device details
                 case 0x12: // serial type 2
                 {
-                    Debug("ParseCrestron Serial Type 2: " + Utils.createHexPrintableString(b1));
+                    OnDebug(eDebugEventType.Info, "ParseCrestron Serial Type 2: " + StringHelper.CreateHexPrintableString(b1));
                     break;
                 }
                 case 0x15: // serial type 3
                 {
-                    Debug("ParseCrestron Serial Type 3: " + Utils.createHexPrintableString(b1));
+                    OnDebug(eDebugEventType.Info, "ParseCrestron Serial Type 3: " + StringHelper.CreateHexPrintableString(b1));
                     ushort idx = (ushort)(b1[7] * 0x100 + b1[8] + 1);
                     // "$05,$00,$08,$00,$00,$09,$15,$00,$00,$03,'a'"		= ser 1 to a
                     // "$05,$00,$0A,$00,$00,$09,$15,$00,$02,$03,'abc'"		= ser 3 to abc
-                    string str = Encoding.Default.GetString(b1);
+                    string str = StringHelper.GetString(b1);
                     string val = str.Substring(10);
                     SerialEventIn(dev, idx, val);
                     break;
@@ -417,7 +549,7 @@ namespace avplus
                 case 0x38: // smart object
                 {
                     Byte ipid = dev != null ? dev.id : uis[0].id;
-                    Debug("ParseCrestron Smart object " + Utils.createHexPrintableString(b1));
+                    //OnDebug(eDebugEventType.Info, "ParseCrestron Smart object " + StringHelper.CreateHexPrintableString(b1));
                     // \x05\x00\x0C\x00\x00\x09\x38\x00\x00\x00\x03\x03\x27\x00\x00 // id 3, press 1
                     // \x05\x00\x0E\x00\x00\x0B\x38\x00\x00\x00\x03\x05\x14\x00\x03\x00\x01 // id 3 analog = 1
                     // \x05\x00\x0C\x00\x00\x09\x38\x00\x00\x00\x03\x03\x27\x00\x80 // id 3 release 1
@@ -430,27 +562,27 @@ namespace avplus
                         if (b1.Length < 16) // digi, b[12]=0x27
                         {
                             ushort idx = (ushort)((b1[14] & 0x7F) * 0x100 + b1[13] + 1);
-                            bool val = !Utils.GetBit(b1[14], 7);
+                            bool val = !StringHelper.GetBit(b1[14], 7);
                             DigitalSmartObjectEventIn(dev, onjectId, idx, val);
-                            //Debug(String.Format("IPID {0} Smart object ID {1} Digital[{2}]:{3}", ipid, onjectId, idx, val));
+                            OnDebug(eDebugEventType.Info, "IPID {0} Smart object ID {1} Digital[{2}]:{3}", ipid, onjectId, idx, val);
                         }
                         else // ana, b[12]=0x14
                         {
                             ushort idx = (ushort)0;
                             ushort val = (ushort)b1[16];
                             AnalogueSmartObjectEventIn(dev, onjectId, idx, val);
-                            Debug(String.Format("IPID {0} Smart object ID {1} Analog[{2}]:{3}", ipid, onjectId, idx, val));
+                            OnDebug(eDebugEventType.Info, "IPID {0} Smart object ID {1} Analog[{2}]:{3}", ipid, onjectId, idx, val);
                         }
                     }
                     catch (Exception e)
                     {
-                        Debug("Exception: " + e.ToString());
+                        OnDebug(eDebugEventType.Info, "Exception: " + e.ToString());
                     }
                     break;
                 }
                 default : 
                 {
-                    Debug(String.Format("ParseCrestron Unhandled join type {0}: {1}", b1[6], Utils.createHexPrintableString(b1)));
+                    OnDebug(eDebugEventType.Info, "ParseCrestron Unhandled join type {0}: {1}", b1[6], StringHelper.CreateHexPrintableString(b1));
                     break;
                 }
 			}
@@ -460,27 +592,27 @@ namespace avplus
             if (b1.Length > pos)
                 DeviceSignIn(RegisterConnection(c, b1[pos]));
             else
-                Debug("Sign on error: " + Utils.createHexPrintableString(b1));
+                OnDebug(eDebugEventType.Info, "Sign on error: " + StringHelper.CreateHexPrintableString(b1));
         }
         public void ParseCrestronString(Connection c, byte[] b1)
         {
-            //Debug("ParseCrestron: " + Utils.createHexPrintableString(b1));
-            //string s1 = Encoding.UTF8.GetString(b1);
+            //OnDebug(eDebugEventType.Info, "ParseCrestron: " + StringHelper.CreateHexPrintableString(b1));
+            //string s1 = Encoding.GetEncoding("ISO-8859-1").GetString(b1);
             CrestronDevice dev = uis.Find(x => x.connections.Contains(c));
             Byte ipid = dev != null ? dev.id : uis[0].id;
             switch (b1[0])
             {
-                case 0x00: { Debug("Ack"); break; }
+                case 0x00: { OnDebug(eDebugEventType.Info, "Ack"); break; }
                 case 0x01: { SignOn(c, b1, 8); break; }
-                case 0x02: { Debug("Connection accepted" + dev == null ? " IPID " + dev.id : ""); break; }
-                case 0x04: { Debug("Connection refused"  + dev == null ? " IPID " + dev.id : ""); break; }
+                case 0x02: { OnDebug(eDebugEventType.Info, "Connection accepted" + dev == null ? " IPID " + dev.id : ""); break; }
+                case 0x04: { OnDebug(eDebugEventType.Info, "Connection refused"  + dev == null ? " IPID " + dev.id : ""); break; }
                 case 0x05: { ParseJoinEvent(c, b1); break; }
                 case 0x0A: { SignOn(c, b1, 4); break; }
-                case 0x0D: { Send(c, "\x0E\x00\x02\x00\x00"); break; } //Debug("Ping");
-                case 0x0E: { break; } //Debug("Pong");
-                case 0x0F: { Debug("Query"); break; }
+                case 0x0D: { Send(c, "\x0E\x00\x02\x00\x00"); break; } //OnDebug(eDebugEventType.Info, "Ping");
+                case 0x0E: { break; } //OnDebug(eDebugEventType.Info, "Pong");
+                case 0x0F: { OnDebug(eDebugEventType.Info, "Query"); break; }
                 case 0x12: { ParseSerialUnicodeEvent(c, b1); break; }
-                default: { Debug("ParseCrestron Unknown: " + Utils.createHexPrintableString(b1)); break; }
+                default: { OnDebug(eDebugEventType.Info, "ParseCrestron Unknown: " + StringHelper.CreateHexPrintableString(b1)); break; }
 
             }
         }
@@ -489,7 +621,7 @@ namespace avplus
         {
             CrestronDevice dev = uis.Find(x => x.connections.Contains(c));
             string s = dev == null ? "": " IPID " + dev.id.ToString();
-            Debug("SendAcceptMessage" + s);
+            OnDebug(eDebugEventType.Info, "SendAcceptMessage" + s);
             string sMsg_ = "\x0F\x00\x01\x02"; // accept connection
             Send(c, sMsg_);
         }
@@ -514,30 +646,22 @@ namespace avplus
                 }
                 catch (Exception e)
                 {
-                    Debug("Exception: " + e.ToString());
+                    OnDebug(eDebugEventType.Info, "Exception: " + e.ToString());
                 }
             }
         }
+
         #endregion
 
         public void AddToWaitQueue(CrestronDevice device, ushort idx, bool state, int msec)
         {
-            Thread.Sleep(msec);
+            Thread.Sleep(msec); // todo: put this on another thread
             SendDigital(device, idx, state);
         }
-    }
-
-    class CrestronDevice : CrestronJoins
-    {
-        public List<CrestronJoins> smartGraphics = new List<CrestronJoins>();
-        public List<Connection> connections = new List<Connection>();
-        public string version { set; get; }
-        public ushort currentPage;
-
-        public CrestronDevice(byte IPID, Crestron_CIP_Server ControlSystem)
-            : base(IPID)
+        public void AddToWaitQueue(CrestronDevice device, byte id, ushort idx, bool state, int msec)
         {
-
+            Thread.Sleep(msec); // todo: put this on another thread
+            SendDigitalSmartObject(device, id, (byte)idx, state);
         }
     }
 

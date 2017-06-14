@@ -1,6 +1,6 @@
 ﻿// License info and recommendations
 //-----------------------------------------------------------------------
-// <copyright file="Program.cs" company="AVPlus Integration Pty Ltd">
+// <copyright file="StringHelper.cs" company="AVPlus Integration Pty Ltd">
 //     {c} AV Plus Pty Ltd 2017.
 //     http://www.avplus.net.au
 //     20170611 Rod Driscoll
@@ -30,20 +30,21 @@
 
 namespace AVPlus.CrestronCIP
 {
-    using System;
-    using System.Windows.Forms;
-
-    static class Program
+    public enum eDebugEventType
     {
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
-        [STAThread]
-        static void Main()
+        NA,
+        Info,
+        Notice,
+        Ok,
+        Warn,
+        Error
+    }
+
+    public class Logging
+    {
+        public static void OnDebug(eDebugEventType eventType, string str, params object[] list)
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new ClientForm());
+            System.Console.WriteLine(str, list);
         }
     }
 }

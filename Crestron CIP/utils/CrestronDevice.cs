@@ -1,6 +1,6 @@
 ﻿// License info and recommendations
 //-----------------------------------------------------------------------
-// <copyright file="Program.cs" company="AVPlus Integration Pty Ltd">
+// <copyright file="CrestronDevice.cs" company="AVPlus Integration Pty Ltd">
 //     {c} AV Plus Pty Ltd 2017.
 //     http://www.avplus.net.au
 //     20170611 Rod Driscoll
@@ -30,20 +30,20 @@
 
 namespace AVPlus.CrestronCIP
 {
-    using System;
-    using System.Windows.Forms;
+    using System.Collections.Generic;
+    using AVPlus.sockets;
 
-    static class Program
+    public class CrestronDevice : CrestronJoins
     {
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
-        [STAThread]
-        static void Main()
+        public List<CrestronJoins> smartObjects = new List<CrestronJoins>();
+        public List<Connection> connections = new List<Connection>();
+        public string version { set; get; }
+        public ushort currentPage;
+
+        public CrestronDevice(byte IPID, Crestron_CIP_Server ControlSystem)
+            : base(IPID)
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new ClientForm());
+
         }
     }
 }

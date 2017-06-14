@@ -1,60 +1,88 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Windows.Forms;
-using System.Net;
-using System.Net.Sockets;
+﻿// License info and recommendations
+//-----------------------------------------------------------------------
+// <copyright file="Form1.cs" company="AVPlus Integration Pty Ltd">
+//     {c} AV Plus Pty Ltd 2017.
+//     http://www.avplus.net.au
+//     20170611 Rod Driscoll
+//     e: rdriscoll@avplus.net.au
+//     m: +61 428 969 608
+//     Permission is hereby granted, free of charge, to any person obtaining a copy
+//     of this software and associated documentation files (the "Software"), to deal
+//     in the Software without restriction, including without limitation the rights
+//     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//     copies of the Software, and to permit persons to whom the Software is
+//     furnished to do so, subject to the following conditions:
+//     
+//     The above copyright notice and this permission notice shall be included in
+//     all copies or substantial portions of the Software.
+//     
+//     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+//     THE SOFTWARE.
+//
+//     For more details please refer to the LICENSE file located in the root folder 
+//      of the project source code;
+// </copyright>
 
-namespace avplus
+namespace AVPlus.CrestronCIP
 {
+    using System;
+    using System.Windows.Forms;
+
     public partial class ClientForm : Form
     {
         Crestron_CIP_Server Crestron;
-        CrestronDevice device;
-
-        public delegate void StringDelegate(string str);
-        public StringDelegate debug;
-
-        //public delegate void CrestronDeviceDelegate(int idx, string str);
-        //public StringWithIndexDelegate serFb;
-
-        public delegate void StringWithIndexDelegate(int idx, string str);
-        public StringWithIndexDelegate serFb;
 
         public ClientForm()
         {
             InitializeComponent();
-            debug  = new StringDelegate(Debug);
-            serFb = new StringWithIndexDelegate(doSerFb);
         }
 
-        #region delegate functions
-        public void Debug(string str) // string str
+        #region event functions
+
+
+        void UpdateMainTextbox(string s)
         {
-            richTextBox1.AppendText(str + "\n");
+            if (richTextBox1.InvokeRequired)
+                this.Invoke(new Action<string>(UpdateMainTextbox), new object[] { s });
+            else
+                richTextBox1.AppendText(s + "\n");
+        }
+        void Crestron_Debug(object sender, StringEventArgs e)
+        {
+            UpdateMainTextbox(e.val);
         }
 
-        public void doSerFb(int idx, string str) // string str
+        void UpdateSerialTextbox(string s)
         {
-            switch (idx)
+            if (tbSer.InvokeRequired)
+                this.Invoke(new Action<string>(UpdateSerialTextbox), new object[] { s });
+            else
+                tbSer.Text = s;
+        }
+        void Crestron_SetSerial(object sender, SerialEventArgs e)
+        {
+            switch (e.join)
             {
                 case 1:
-                    tbSer.Text = str;
+                    UpdateSerialTextbox(e.val);
                     break;
             }
         }
+
         #endregion
 
         #region events
 
         private void ClientForm_Shown(object sender, EventArgs e)
         {
-            Crestron = new Crestron_CIP_Server(this);
-            device = new CrestronDevice(0x03, Crestron);
+            Crestron = new Crestron_CIP_Server();
+            Crestron.Debug     += new EventHandler<StringEventArgs>(Crestron_Debug);
+            Crestron.SetSerial += new EventHandler<SerialEventArgs>(Crestron_SetSerial);
             Crestron.StartServer();
         }
       
@@ -85,7 +113,7 @@ namespace avplus
             Crestron.SendSerial(Crestron.GetCrestronDevice(0x03), 2, tbSer.Text);
             //Crestron.SendSerial(Crestron.GetCrestronDevice(0x03), 3, tbSer.Text);
             //Crestron.SendSerialSmartObject(device, 3, 1, tbSer.Text);
-            string s = Utils.createBytesFromHexString(tbSer.Text);
+            string s = StringHelper.CreateBytesFromHexString(tbSer.Text);
             //Crestron.SendSerialSmartObject(Crestron.GetCrestronDevice(0x03), 3, 1, s);
             //Crestron.Send(Crestron.GetCrestronDevice(0x03), s);
         }
