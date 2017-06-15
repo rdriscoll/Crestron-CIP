@@ -26,28 +26,21 @@ Implemented functions are:
  - Dynamic Text 
  - Dynamic Icons (both Analog and Serial)
 
-Known issues:
- - The TCP server sometimes won't accept a connection and needs to be restarted. The TCP server needs to be implemented better.
- - Commands to the touch panel need to be queued, when you send more than 2 or 3 at once they often fail.
-
-
 ## Motivation
 
 This was originally created to supply clients a fully working Crestron XPanel with back end logic and no need to set up a processor. 
 It is quite good for writing and testing Crestron programs in pure C# without incurring the delays of transferring files and waiting for reboots, then once most code is written porting the code to SIMPLSharpPro code.
 
-
 ## Installation
 
-No installation required.
+No installation required although access to Crestron software is required to edit the VTPro file. Crestron software must be obtained directly from Crestron so please do not ask for it.
 
 ## Usage
 
 Compile and run the code then open the XPanel with comms settings configured to 127.0.0.1, press buttons and watch stuff work.
 The button press handlers are in "TestView2.cs", this is where to start. The idea is to swap out view classes per project.
 
-T"Crestron CIP Server.cs", is like the Controlsystem.cs file on a Crestron.
-
+"Crestron CIP Server.cs", is like the Controlsystem.cs file on a Crestron.
 
 ## API Reference
 
@@ -57,10 +50,15 @@ The code is the current documentation, feel free to create some and submit a pul
 
 Tests are not implemented, feel free to make some.
 
-## Contributors
+## [Known issues](https://github.com/rdriscoll/Crestron-CIP/issues)
 
-Rod Driscoll: rdriscoll@avplus.net.au
+## [Contributors](https://github.com/rdriscoll/Crestron-CIP/graphs/contributors)
 
-## License
+[Rod Driscoll](https://github.com/rdriscoll): rdriscoll@avplus.net.au
 
-MIT License.
+## [Contributing](https://github.com/rdriscoll/Crestron-CIP/blob/master/CONTRIBUTING.md)
+
+## [Code of Conduct](https://github.com/rdriscoll/Crestron-CIP/blob/master/CODE_OF_CONDUCT.md)
+
+## [License](https://github.com/rdriscoll/Crestron-CIP/blob/master/LICENSE)
+
