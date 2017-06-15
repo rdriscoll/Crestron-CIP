@@ -44,21 +44,26 @@ The button press handlers are in "TestView2.cs", this is where to start. The ide
 
 ## API Reference
 
-The code is the current documentation, feel free to create some and submit a pull request. 
+The code is the current documentation, feel free to create some documentation on the project Wiki. 
 
 ## Tests
 
-Tests are not implemented, feel free to make some.
+Tests are not implemented, feel free to make some and send a pull request.
 
-## [Known issues](https://github.com/rdriscoll/Crestron-CIP/issues)
+## Known issues
+Refer to: [Known issues](https://github.com/rdriscoll/Crestron-CIP/issues)
 
-## [Contributors](https://github.com/rdriscoll/Crestron-CIP/graphs/contributors)
+## Contributors
+Refer to: [Contributors](https://github.com/rdriscoll/Crestron-CIP/graphs/contributors)
 
 [Rod Driscoll](https://github.com/rdriscoll): rdriscoll@avplus.net.au
 
-## [Contributing](https://github.com/rdriscoll/Crestron-CIP/blob/master/CONTRIBUTING.md)
+## Contributing
+Refer to: [Contributing](https://github.com/rdriscoll/Crestron-CIP/blob/master/CONTRIBUTING.md)
 
-## [Code of Conduct](https://github.com/rdriscoll/Crestron-CIP/blob/master/CODE_OF_CONDUCT.md)
+## Code of Conduct
+Refer to: [Code of Conduct](https://github.com/rdriscoll/Crestron-CIP/blob/master/CODE_OF_CONDUCT.md)
 
-## [License](https://github.com/rdriscoll/Crestron-CIP/blob/master/LICENSE)
+## License
+Refer to: [License](https://github.com/rdriscoll/Crestron-CIP/blob/master/LICENSE)
 
