@@ -59,11 +59,11 @@ Refer to: [Contributors](https://github.com/rdriscoll/Crestron-CIP/graphs/contri
 [Rod Driscoll](https://github.com/rdriscoll): rdriscoll@avplus.net.au
 
 ## Contributing
-Refer to: [Contributing](https://github.com/rdriscoll/Crestron-CIP/blob/master/CONTRIBUTING.md)
+Refer to: [CONTRIBUTING.md](https://github.com/rdriscoll/Crestron-CIP/blob/master/CONTRIBUTING.md)
 
 ## Code of Conduct
-Refer to: [Code of Conduct](https://github.com/rdriscoll/Crestron-CIP/blob/master/CODE_OF_CONDUCT.md)
+Refer to: [CODE_OF_CONDUCT.md](https://github.com/rdriscoll/Crestron-CIP/blob/master/CODE_OF_CONDUCT.md)
 
 ## License
-Refer to: [License](https://github.com/rdriscoll/Crestron-CIP/blob/master/LICENSE)
+Refer to: [LICENSE](https://github.com/rdriscoll/Crestron-CIP/blob/master/LICENSE)
 
