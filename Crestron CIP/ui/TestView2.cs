@@ -78,21 +78,30 @@ namespace AVPlus.CrestronCIP
         public override void DigitalEventIn(CrestronDevice currentDevice, ushort idx, bool val)
         {
             //OnDebug(eDebugEventType.Info, "DigitalEventIn, join:{0}, val:{1}", idx.ToString(), val.ToString());
-            if (val) // press
+            var sig = currentDevice.digitalInputs.Find(x => x.pos == idx);
+            if (sig == null || sig.value != val)  // changed
             {
-                OnDebug(eDebugEventType.Info, "DigitalEventIn, join:{0}, val:{1}", idx.ToString(), val.ToString());
-                switch (idx)
+                if (val)  // press
                 {
-                    case DIG_TOGGLE_POWER:
-                        OnToggleDigital(currentDevice, idx);
-                        break;
-                    case DIG_MACRO:
-                        OnPulseDigital(currentDevice, DIG_TOGGLE_POWER, 200);
-                        var randomNumber = new Random().Next(ushort.MaxValue);
-                        OnSetAnalog(currentDevice, ANA_RANDOM, (ushort)randomNumber);
-                        OnSetSerial(currentDevice, SER_VALUE, randomNumber.ToString());
-                        break;
+                    OnDebug(eDebugEventType.Info, "DigitalEventIn (changed), join:{0}, val:{1}", idx.ToString(), val.ToString());
+                    switch (idx)
+                    {
+                        case DIG_TOGGLE_POWER:
+                            OnToggleDigital(currentDevice, idx);
+                            break;
+                        case DIG_MACRO:
+                            OnPulseDigital(currentDevice, DIG_TOGGLE_POWER, 200);
+                            var randomNumber = new Random().Next(ushort.MaxValue);
+                            OnSetAnalog(currentDevice, ANA_RANDOM, (ushort)randomNumber);
+                            OnSetSerial(currentDevice, SER_VALUE, randomNumber.ToString());
+                            break;
+                    }
                 }
+                // not processing releases
+            }
+            else
+            {
+                OnDebug(eDebugEventType.Info, "DigitalEventIn (held), join:{0}, val:{1}", idx.ToString(), val.ToString());
             }
         }
 
@@ -133,14 +142,31 @@ namespace AVPlus.CrestronCIP
         public override void DigitalSmartObjectEventIn(CrestronDevice device, byte id, ushort idx, bool val)
         {
             //OnDebug(eDebugEventType.Info, "DigitalSmartObjectEventIn, ID:{0}, join:{1}, val:{2}", id.ToString(), idx.ToString(), val.ToString());
-            switch (id)
+            var so = device.smartObjects.Find(x => x.id == id);
+            Digital sig = null;
+            if (so != null)
+                sig = so.digitalInputs.Find(x => x.pos == idx);
+            if (sig == null || sig.value != val)  // changed
             {
-                case SG_DPAD             : SmartObject_DPad_DigSigChange       (device, idx, val); break;
-                case SG_KEYPAD           : SmartObject_KeyPad_DigSigChange     (device, idx, val); break;
-                case SG_BTN_LIST         : SmartObject_BtnList_DigSigChange    (device, idx, val); break;
-                case SG_DYNAMIC_BTN_LIST : SmartObject_DynBtnList_DigSigChange (device, idx, val); break;
-                case SG_DYNAMIC_ICON_LIST: SmartObject_DynIconList_DigSigChange(device, idx, val); break;
+                OnDebug(eDebugEventType.Info, "DigitalSmartObjectEventIn (changed), ID:{0}, join:{1}, val:{2}", id.ToString(), idx.ToString(), val.ToString());
+                switch (id)
+                {
+                    case SG_DPAD             : SmartObject_DPad_DigSigChange       (device, idx, val); break;
+                    case SG_KEYPAD           : SmartObject_KeyPad_DigSigChange     (device, idx, val); break;
+                    case SG_BTN_LIST         : SmartObject_BtnList_DigSigChange    (device, idx, val); break;
+                    case SG_DYNAMIC_BTN_LIST : SmartObject_DynBtnList_DigSigChange (device, idx, val); break;
+                    case SG_DYNAMIC_ICON_LIST: SmartObject_DynIconList_DigSigChange(device, idx, val); break;
+                }
             }
+            else // held
+            {
+                OnDebug(eDebugEventType.Info, "DigitalSmartObjectEventIn (held), ID:{0}, join:{1}, val:{2}", id.ToString(), idx.ToString(), val.ToString());
+                switch (id)
+                {
+                    case SG_DPAD             : SmartObject_DPad_DigSigChange       (device, idx, val); break;
+                }
+            }
+
         }
         public override void AnalogSmartObjectEventIn (CrestronDevice device, byte id, ushort idx, ushort val)
         {

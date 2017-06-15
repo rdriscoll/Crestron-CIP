@@ -104,18 +104,21 @@ namespace AVPlus.CrestronCIP
 
         public void DigitalEventIn (CrestronDevice device, ushort idx, bool val)
         {
-            //OnDebug(eDebugEventType.Info, "Digital[{0}]: {1}", idx.ToString(), val.ToString());
+            //OnDebug(eDebugEventType.Info, "Digital[{0}]: {1}", idx.ToString(), val.ToString()); 
             uiHandler.DigitalEventIn(device, idx, val);
+            setInputSigState(device, 0, idx, val); // do this after handling so the handler can tell if the state has changed
         }
         public void AnalogEventIn  (CrestronDevice device, ushort idx, ushort val)
         {
             OnDebug(eDebugEventType.Info, "Analogue[{0}]: {1}", idx.ToString(), val.ToString());
             uiHandler.AnalogEventIn(device, idx, val);
+            setInputSigState(device, 0, idx, val); // do this after handling so the handler can tell if the state has changed
         }
         public void SerialEventIn  (CrestronDevice device, ushort idx, string val)
         {
             OnDebug(eDebugEventType.Info, "Serial[{0}]: {1}", idx.ToString(), val);
             uiHandler.SerialEventIn(device, idx, val);
+            setInputSigState(device, 0, idx, val); // do this after handling so the handler can tell if the state has changed
         }
 
         public void OnSetSerial(SerialEventArgs args)
@@ -128,14 +131,17 @@ namespace AVPlus.CrestronCIP
         {
             //OnDebug(eDebugEventType.Info, "IPID {0} SmartObject ID {1} Digital[{2}]:{3}", device.id, id, idx, val);
             uiHandler.DigitalSmartObjectEventIn(device, id, idx, val);
+            setInputSigState(device, id, idx, val); // do this after handling so the handler can tell if the state has changed
         }
         public void AnalogueSmartObjectEventIn(CrestronDevice device, byte id, ushort idx, ushort val)
         {
-            OnDebug(eDebugEventType.Info, "SmartObject {0} Analogue[{1}]: {2}", id.ToString(), idx.ToString(), val.ToString());
+            //OnDebug(eDebugEventType.Info, "SmartObject {0} Analogue[{1}]: {2}", id.ToString(), idx.ToString(), val.ToString());
+            setInputSigState(device, id, idx, val); // do this after handling so the handler can tell if the state has changed
         }
         public void SerialSmartObjectEventIn  (CrestronDevice device, byte id, ushort idx, string val)
         {
             OnDebug(eDebugEventType.Info, "SmartObject {0} String[{1}]: {2}", id.ToString(), idx.ToString(), val);
+            setInputSigState(device, id, idx, val); // do this after handling so the handler can tell if the state has changed
         }
 
         public void DeviceSignIn(CrestronDevice device)
@@ -162,6 +168,43 @@ namespace AVPlus.CrestronCIP
                 uis.Add(dev);
             }
             return dev;
+        }
+
+        private void setInputSigState(CrestronDevice device, byte id, ushort idx, string val)
+        {
+            CrestronJoins joins = id > 0 ? getSmartObject(device, id) : device;
+            var sig = joins.serialInputs.Find(x => x.pos == idx);
+            if (sig == null)
+            {
+                sig = new Serial(idx, val);
+                joins.serialInputs.Add(sig);
+            }
+            else
+                sig.value = val;
+        }
+        private void setInputSigState(CrestronDevice device, byte id, ushort idx, ushort val)
+        {
+            CrestronJoins joins = id > 0 ? getSmartObject(device, id) : device;
+            var sig = joins.analogInputs.Find(x => x.pos == idx);
+            if (sig == null)
+            {
+                sig = new Analog(idx, val);
+                joins.analogInputs.Add(sig);
+            }
+            else
+                sig.value = val;
+        }
+        private void setInputSigState(CrestronDevice device, byte id, ushort idx, bool val)
+        {
+            CrestronJoins joins = id > 0 ? getSmartObject(device, id) : device;
+            var sig = joins.digitalInputs.Find(x => x.pos == idx);
+            if (sig == null)
+            {
+                sig = new Digital(idx, val);
+                joins.digitalInputs.Add(sig);
+            }
+            else
+                sig.value = val;
         }
 
         #endregion
@@ -212,19 +255,21 @@ namespace AVPlus.CrestronCIP
 
         public void SendDigital (CrestronDevice device, ushort idx, bool val)
         {
+            setOutputSigState(device, 0, idx, val);
             ushort NewIdx = (ushort)StringHelper.SetBit(idx - 1, 15, !val);
             byte[] b = { (byte)(NewIdx % 0x100), (byte)(NewIdx / 0x100) };
             string str = "\x05\x00\x06\x00\x00\x03\x00" + StringHelper.GetString(b);
             Send(device, str);
             //Debug("SendDigital: " + StringHelper.CreateHexPrintableString(str));
             // local feedback
-            if (device.digitals.Where(x => x.pos == idx).Count() == 0)
-                device.digitals.Add(new Digital(idx, false));
-            Digital d = device.digitals.Find(x => x.pos == idx);
+            if (device.digitalOutputs.Where(x => x.pos == idx).Count() == 0)
+                device.digitalOutputs.Add(new Digital(idx, false));
+            Digital d = device.digitalOutputs.Find(x => x.pos == idx);
             d.value = val;
         }
         public void SendAnalogue(CrestronDevice device, ushort idx, ushort val)
         {
+            setOutputSigState(device, 0, idx, val);
             byte idxLowByte = (byte)((idx - 1) % 0x100);
             byte idxHighByte = (byte)((idx - 1) / 0x100);
             byte LevelLowByte  = (byte)(val % 0x100);
@@ -247,6 +292,7 @@ namespace AVPlus.CrestronCIP
         }
         public void SendSerial  (CrestronDevice device, ushort idx, string val)
         {
+            setOutputSigState(device, 0, idx, val);
             string str = "";
             if (val.Length < 7)
             {
@@ -279,49 +325,14 @@ namespace AVPlus.CrestronCIP
             }
             Send(device, str);
         }
-
-        public void ToggleDigital(CrestronDevice device, ushort idx)
-        {
-            if (device.digitals.Where(x => x.pos == idx).Count() == 0)
-                device.digitals.Add(new Digital(idx, false));
-            IEnumerable<Digital> query = device.digitals.Where(x => x.pos == idx);
-            foreach (Digital d in query)
-                SendDigital(device, idx, !d.value);
-        }
-        public void ToggleDigitalSmartObject(CrestronDevice device, byte id, ushort idx)
-        {
-            OnDebug(eDebugEventType.Info, "ToggleDigitalSmartObject:{0}:{1} ",id, idx);
-            CrestronJoins smartObject = device.smartObjects.Find(x => x.id == id);
-            if (smartObject == null)
-            {
-                smartObject = new CrestronJoins(id);
-                device.smartObjects.Add(smartObject);
-            }
-            Digital dig = smartObject.digitals.Find(x => x.pos == idx);
-            if (dig == null)
-            {
-                dig = new Digital(idx, false);
-                device.smartObjects.Add(smartObject);
-            }
-            SendDigitalSmartObject(device, id, idx, !dig.value);
-        }
-        public void PulseDigital(CrestronDevice device, ushort idx, int msec)
-        {
-            SendDigital(device, idx, false);
-            var pulseData = new PulseData(device, 0, idx, true);
-            System.Threading.Timer pulseTimer = null;
-            pulseTimer = new Timer((pulseCallback) =>
-            {
-                SendDigital(pulseData.device, pulseData.idx, pulseData.state);
-                pulseTimer.Dispose();
-            }, pulseData, msec, msec);
-        }
-        public void SendAnalogPercent      (CrestronDevice device, ushort idx, byte val)
-        {
-            SendAnalogue(device, idx, (ushort)StringHelper.ConvertRanges(val, 0, 100, 0, 0xFFFF));
-        }
         public void SendSerialUnicode      (CrestronDevice device, ushort idx, string val)
         {
+            var sig = device.serialOutputs.Find(x => x.pos == idx);
+            if (sig == null)
+                device.serialOutputs.Add(new Serial(idx, val));
+            else
+                sig.value = val;
+
             //\x12\x00\x0A\x00\x00\x00\x06\x34\x00\x00\x07\x31\x00 // "1"
             //\x12\x00\x0C\x00\x00\x00\x08\x34\x00\x00\x07\x31\x00\x31\x00\x31\x00 // "111"
             byte[] b1 = { (byte)(val.Length + 9) };
@@ -338,8 +349,62 @@ namespace AVPlus.CrestronCIP
                 + StringHelper.GetString(b4);
             Send(device, str);
         }
-        public void SendSerialSmartObject  (CrestronDevice device, byte id, ushort idx, string val)
+
+        public void ToggleDigital           (CrestronDevice device, ushort idx)
         {
+            if (device.digitalOutputs.Where(x => x.pos == idx).Count() == 0)
+                device.digitalOutputs.Add(new Digital(idx, false));
+            IEnumerable<Digital> query = device.digitalOutputs.Where(x => x.pos == idx);
+            foreach (Digital d in query)
+                SendDigital(device, idx, !d.value);
+        }
+        public void PulseDigital            (CrestronDevice device, ushort idx, int msec)
+        {
+            SendDigital(device, idx, false);
+            var pulseData = new PulseData(device, 0, idx, true);
+            System.Threading.Timer pulseTimer = null;
+            pulseTimer = new Timer((pulseCallback) =>
+            {
+                SendDigital(pulseData.device, pulseData.idx, pulseData.state);
+                pulseTimer.Dispose();
+            }, pulseData, msec, msec);
+        }
+        public void SendAnalogPercent       (CrestronDevice device, ushort idx, byte val)
+        {
+            SendAnalogue(device, idx, (ushort)StringHelper.ConvertRanges(val, 0, 100, 0, 0xFFFF));
+        }
+        public void ToggleDigitalSmartObject(CrestronDevice device, byte id, ushort idx)
+        {
+            OnDebug(eDebugEventType.Info, "ToggleDigitalSmartObject:{0}:{1} ",id, idx);
+            CrestronJoins smartObject = device.smartObjects.Find(x => x.id == id);
+            if (smartObject == null)
+            {
+                smartObject = new CrestronJoins(id);
+                device.smartObjects.Add(smartObject);
+            }
+            Digital dig = smartObject.digitalOutputs.Find(x => x.pos == idx);
+            if (dig == null)
+            {
+                dig = new Digital(idx, false);
+                device.smartObjects.Add(smartObject);
+            }
+            SendDigitalSmartObject(device, id, idx, !dig.value);
+        }
+        public void PulseDigitalSmartObject (CrestronDevice device, byte id, ushort idx, int msec)
+        {
+            SendDigitalSmartObject(device, id, (byte)idx, false);
+            var pulseData = new PulseData(device, id, idx, true);
+            System.Threading.Timer pulseTimer = null;
+            pulseTimer = new Timer((pulseCallback) =>
+            {
+                SendDigitalSmartObject(pulseData.device, pulseData.id, pulseData.idx, pulseData.state);
+                pulseTimer.Dispose();
+            }, pulseData, msec, msec);
+        }
+
+        public void SendSerialSmartObject   (CrestronDevice device, byte id, ushort idx, string val)
+        {
+            setOutputSigState(device, id, idx, val);
             byte[] bLen1 = { (byte)(val.Length + 15) };
             byte[] bLen2 = { (byte)(val.Length + 11) };
             byte[] bLen3 = { (byte)(val.Length + 4) };
@@ -362,8 +427,9 @@ namespace AVPlus.CrestronCIP
             //Debug("SendSerialSmartObject: " + StringHelper.CreateHexPrintableString(str));
             Send(device, str);
         }
-        public void SendDigitalSmartObject (CrestronDevice device, byte id, ushort idx, bool val)
+        public void SendDigitalSmartObject  (CrestronDevice device, byte id, ushort idx, bool val)
         {
+            setOutputSigState(device, id, idx, val);
             tempBool = !tempBool;
             // \x05\x00\x0C\x00\x00\x09\x38\x00\x00\x00\x03\x03\x27\x00\x00 // id 3, press 1
             // \x05\x00\x0C\x00\x00\x09\x38\x00\x00\x00\x03\x03\x27\x01\x80 // id 3, release 2
@@ -374,22 +440,12 @@ namespace AVPlus.CrestronCIP
                 + StringHelper.GetString(b1)
                 + "\x03\x00" //"\x03\x27"
                 + StringHelper.GetString(b2);
-            OnDebug(eDebugEventType.Info, "SendDigitalSmartObject: " + StringHelper.CreateHexPrintableString(str));
+            //OnDebug(eDebugEventType.Info, "SendDigitalSmartObject: " + StringHelper.CreateHexPrintableString(str));
             Send(device, str);
         }
-        public void PulseDigitalSmartObject(CrestronDevice device, byte id, ushort idx, int msec)
+        public void SendAnalogSmartObject   (CrestronDevice device, byte id, ushort idx, ushort val)
         {
-            SendDigitalSmartObject(device, id, (byte)idx, false);
-            var pulseData = new PulseData(device, id, idx, true);
-            System.Threading.Timer pulseTimer = null;
-            pulseTimer = new Timer((pulseCallback) =>
-            {
-                SendDigitalSmartObject(pulseData.device, pulseData.id, pulseData.idx, pulseData.state);
-                pulseTimer.Dispose();
-            }, pulseData, msec, msec);
-        }
-        public void SendAnalogSmartObject  (CrestronDevice device, byte id, ushort idx, ushort val)
-        {
+            setOutputSigState(device, id, idx, val);
             // \x05\x00\x0E\x00\x00\x0B\x38\x00\x00\x00\x03\x05\x14\x00\x03\x00\x03 // id 3 analog setNumItems(idx 3) val 3
             // \x05\x00\x0E\x00\x00\x0B\x38\x00\x00\x00\x05\x05\x14\x00\x0a\x00\x09 // id 5 analog setItem1IconAna(idx 11) val 9
             byte[] b1 = { (byte)id };
@@ -404,6 +460,53 @@ namespace AVPlus.CrestronCIP
             Send(device, str);
         }
 
+        private CrestronJoins getSmartObject(CrestronDevice device, byte id)
+        {
+            var so = device.smartObjects.Find(x => x.id == id);
+            if (so == null)
+            {
+                so = new CrestronJoins(id);
+                device.smartObjects.Add(so);
+            }
+            return so;
+        }
+        private void setOutputSigState      (CrestronDevice device, byte id, ushort idx, string val)
+        {
+            CrestronJoins joins = id > 0 ? getSmartObject(device, id) : device;
+            var sig = joins.serialOutputs.Find(x => x.pos == idx);
+            if (sig == null)
+            {
+                sig = new Serial(idx, val);
+                joins.serialOutputs.Add(sig);
+            }
+            else
+                sig.value = val;
+        }
+        private void setOutputSigState      (CrestronDevice device, byte id, ushort idx, ushort val)
+        {
+            CrestronJoins joins = id > 0 ? getSmartObject(device, id) : device;
+            var sig = joins.analogOutputs.Find(x => x.pos == idx);
+            if (sig == null)
+            {
+                sig = new Analog(idx, val);
+                joins.analogOutputs.Add(sig);
+            }
+            else
+                sig.value = val;
+        }
+        private void setOutputSigState      (CrestronDevice device, byte id, ushort idx, bool val)
+        {
+            CrestronJoins joins = id > 0 ? getSmartObject(device, id) : device;
+            var sig = joins.digitalOutputs.Find(x => x.pos == idx);
+            if (sig == null)
+            {
+                sig = new Digital(idx, val);
+                joins.digitalOutputs.Add(sig);
+            }
+            else
+                sig.value = val;
+        }
+       
         #endregion
         
         #region string_parsing
@@ -577,14 +680,14 @@ namespace AVPlus.CrestronCIP
                             ushort idx = (ushort)((b1[14] & 0x7F) * 0x100 + b1[13] + 1);
                             bool val = !StringHelper.GetBit(b1[14], 7);
                             DigitalSmartObjectEventIn(dev, onjectId, idx, val);
-                            OnDebug(eDebugEventType.Info, "IPID {0} Smart object ID {1} Digital[{2}]:{3}", ipid, onjectId, idx, val);
+                            //OnDebug(eDebugEventType.Info, "IPID {0} Smart object ID {1} Digital[{2}]:{3}", ipid, onjectId, idx, val);
                         }
                         else // ana, b[12]=0x14
                         {
                             ushort idx = (ushort)0;
                             ushort val = (ushort)b1[16];
                             AnalogueSmartObjectEventIn(dev, onjectId, idx, val);
-                            OnDebug(eDebugEventType.Info, "IPID {0} Smart object ID {1} Analog[{2}]:{3}", ipid, onjectId, idx, val);
+                            //OnDebug(eDebugEventType.Info, "IPID {0} Smart object ID {1} Analog[{2}]:{3}", ipid, onjectId, idx, val);
                         }
                     }
                     catch (Exception e)
@@ -665,17 +768,6 @@ namespace AVPlus.CrestronCIP
         }
 
         #endregion
- 
-        public void AddToWaitQueue(CrestronDevice device, ushort idx, bool state, int msec)
-        {
-            Thread.Sleep(msec); // todo: put this on another thread
-            SendDigital(device, idx, state);
-        }
-        public void AddToWaitQueue(CrestronDevice device, byte id, ushort idx, bool state, int msec)
-        {
-            Thread.Sleep(msec); // todo: put this on another thread
-            SendDigitalSmartObject(device, id, (byte)idx, state);
-        }
     }
 
     struct PulseData

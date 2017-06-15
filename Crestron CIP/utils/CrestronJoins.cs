@@ -38,9 +38,13 @@ namespace AVPlus.CrestronCIP
         public String name;
         public byte id { get; set; }
 
-        public List<Digital> digitals = new List<Digital>();
-        public List<Analog> analogs = new List<Analog>();
-        public List<Serial> serials = new List<Serial>();
+        public List<Digital> digitalInputs = new List<Digital>();
+        public List<Analog> analogInputs = new List<Analog>();
+        public List<Serial> serialInputs = new List<Serial>();
+
+        public List<Digital> digitalOutputs = new List<Digital>();
+        public List<Analog> analogOutputs = new List<Analog>();
+        public List<Serial> serialOutputs = new List<Serial>();
 
         public CrestronJoins(byte id)
         {
@@ -68,7 +72,7 @@ namespace AVPlus.CrestronCIP
             this.pos = pos;
         }
     }
-    public class Serial
+    public class Serial 
     {
         public String value;
         public ushort pos;
