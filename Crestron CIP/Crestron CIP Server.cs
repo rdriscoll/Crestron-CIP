@@ -42,6 +42,7 @@ namespace AVPlus.CrestronCIP
     {
         public event EventHandler<SerialEventArgs> SetSerial;
 
+        Thread pulse;
         AUserInterfaceEvents uiHandler = new TestView2();
         List<CrestronDevice> uis = new List<CrestronDevice>();
 
@@ -307,7 +308,13 @@ namespace AVPlus.CrestronCIP
         public void PulseDigital(CrestronDevice device, ushort idx, int msec)
         {
             SendDigital(device, idx, false);
-            AddToWaitQueue(device, idx, true, msec);
+            var pulseData = new PulseData(device, 0, idx, true);
+            System.Threading.Timer pulseTimer = null;
+            pulseTimer = new Timer((pulseCallback) =>
+            {
+                SendDigital(pulseData.device, pulseData.idx, pulseData.state);
+                pulseTimer.Dispose();
+            }, pulseData, msec, msec);
         }
         public void SendAnalogPercent      (CrestronDevice device, ushort idx, byte val)
         {
@@ -373,7 +380,13 @@ namespace AVPlus.CrestronCIP
         public void PulseDigitalSmartObject(CrestronDevice device, byte id, ushort idx, int msec)
         {
             SendDigitalSmartObject(device, id, (byte)idx, false);
-            AddToWaitQueue(device, id, idx, true, msec);
+            var pulseData = new PulseData(device, id, idx, true);
+            System.Threading.Timer pulseTimer = null;
+            pulseTimer = new Timer((pulseCallback) =>
+            {
+                SendDigitalSmartObject(pulseData.device, pulseData.id, pulseData.idx, pulseData.state);
+                pulseTimer.Dispose();
+            }, pulseData, msec, msec);
         }
         public void SendAnalogSmartObject  (CrestronDevice device, byte id, ushort idx, ushort val)
         {
@@ -652,7 +665,7 @@ namespace AVPlus.CrestronCIP
         }
 
         #endregion
-
+ 
         public void AddToWaitQueue(CrestronDevice device, ushort idx, bool state, int msec)
         {
             Thread.Sleep(msec); // todo: put this on another thread
@@ -662,6 +675,22 @@ namespace AVPlus.CrestronCIP
         {
             Thread.Sleep(msec); // todo: put this on another thread
             SendDigitalSmartObject(device, id, (byte)idx, state);
+        }
+    }
+
+    struct PulseData
+    {
+        public CrestronDevice device;
+        public byte id;
+        public ushort idx;
+        public bool state;
+
+        public PulseData(CrestronDevice device, byte id, ushort idx, bool state)
+        {
+            this.device = device;
+            this.id = id;
+            this.idx = idx;
+            this.state = state;
         }
     }
 

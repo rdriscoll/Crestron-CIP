@@ -44,7 +44,9 @@ No installation required.
 ## Usage
 
 Compile and run the code then open the XPanel with comms settings configured to 127.0.0.1, press buttons and watch stuff work.
-The button press handlers are in "Crestron CIP Server.cs", this is where to start.
+The button press handlers are in "TestView2.cs", this is where to start. The idea is to swap out view classes per project.
+
+T"Crestron CIP Server.cs", is like the Controlsystem.cs file on a Crestron.
 
 
 ## API Reference

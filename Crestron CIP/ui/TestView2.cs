@@ -287,11 +287,16 @@ namespace AVPlus.CrestronCIP
             try
             {
                 OnDebug(eDebugEventType.Info, "UResetPinText");
-                Thread.Sleep(1000);
-                keypadText = "";
-                var ui = o as CrestronDevice;
-                if (ui != null)
-                    OnSetSerial(ui, SER_INPUT, keypadText);
+                //Thread.Sleep(1000);
+                System.Threading.Timer pinTimer = null;
+                pinTimer = new Timer((x) =>
+                {
+                    keypadText = "";
+                    var ui = o as CrestronDevice;
+                    if (ui != null)
+                        OnSetSerial(ui, SER_INPUT, keypadText);
+                    pinTimer.Dispose();
+                }, null, 1000, 1000);
             }
             catch (Exception e)
             {
