@@ -1,0 +1,9 @@
+\\Mac\Home\Documents\src\csharp\projects\Crestron CIP\Crestron CIP Tests\bin\Debug\Crestron CIP Tests.dll
+\\Mac\Home\Documents\src\csharp\projects\Crestron CIP\Crestron CIP Tests\bin\Debug\Crestron CIP Tests.pdb
+\\Mac\Home\Documents\src\csharp\projects\Crestron CIP\Crestron CIP Tests\bin\Debug\ClientServer.exe
+\\Mac\Home\Documents\src\csharp\projects\Crestron CIP\Crestron CIP Tests\bin\Debug\nunit.framework.dll
+\\Mac\Home\Documents\src\csharp\projects\Crestron CIP\Crestron CIP Tests\bin\Debug\ClientServer.pdb
+\\Mac\Home\Documents\src\csharp\projects\Crestron CIP\Crestron CIP Tests\bin\Debug\nunit.framework.xml
+\\Mac\Home\Documents\src\csharp\projects\Crestron CIP\Crestron CIP Tests\obj\Debug\ResolveAssemblyReference.cache
+\\Mac\Home\Documents\src\csharp\projects\Crestron CIP\Crestron CIP Tests\obj\Debug\Crestron CIP Tests.dll
+\\Mac\Home\Documents\src\csharp\projects\Crestron CIP\Crestron CIP Tests\obj\Debug\Crestron CIP Tests.pdb

@@ -42,7 +42,6 @@ namespace AVPlus.CrestronCIP
     {
         public event EventHandler<SerialEventArgs> SetSerial;
 
-        Thread pulse;
         AUserInterfaceEvents uiHandler = new TestView2();
         List<CrestronDevice> uis = new List<CrestronDevice>();
 
@@ -298,7 +297,7 @@ namespace AVPlus.CrestronCIP
             {
                 byte[] b1 = { (byte)(val.Length + 7) };
                 byte[] b2 = { (byte)((idx - 1) / 0x100), (byte)((idx - 1) % 0x100) };
-                byte[] b3 = Encoding.Default.GetBytes(val);
+                byte[] b3 = StringHelper.GetBytes(val);
                 str = "\x05\x00"
                     + StringHelper.GetString(b1)
                     + "\x00\x00\x09\x15"
@@ -312,7 +311,7 @@ namespace AVPlus.CrestronCIP
                 byte[] b1 = { (byte)(val.Length + 8) };
                 byte[] b2 = { (byte)(val.Length + 4) };
                 byte[] b3 = { (byte)((idx - 1) / 0x100), (byte)((idx - 1) % 0x100) };
-                byte[] b4 = Encoding.Default.GetBytes(val);
+                byte[] b4 = StringHelper.GetBytes(val);
                 str = "\x12\x00"
                    + StringHelper.GetString(b1)
                    + "\x00\x00\x00"
@@ -338,7 +337,7 @@ namespace AVPlus.CrestronCIP
             byte[] b1 = { (byte)(val.Length + 9) };
             byte[] b2 = { (byte)(val.Length + 5) };
             byte[] b3 = { (byte)((idx - 1) / 0x100), (byte)((idx - 1) % 0x100) };
-            byte[] b4 = Encoding.GetEncoding("ISO-8859-1").GetBytes(val);
+            byte[] b4 = StringHelper.GetBytes(val);
             string str = "\x12\x00"
                 + StringHelper.GetString(b1)
                 + "\x00\x00\x00"
@@ -409,7 +408,7 @@ namespace AVPlus.CrestronCIP
             byte[] bLen2 = { (byte)(val.Length + 11) };
             byte[] bLen3 = { (byte)(val.Length + 4) };
             byte[] bId   = { (byte)(id) };
-            byte[] bVal  = Encoding.Default.GetBytes(val);
+            byte[] bVal = StringHelper.GetBytes(val);
             byte[] bIdx = { (byte)((idx) / 0x100), (byte)((idx) % 0x100) };
             string sIdx = StringHelper.GetString(bIdx);
             string str = "\x12\x00"

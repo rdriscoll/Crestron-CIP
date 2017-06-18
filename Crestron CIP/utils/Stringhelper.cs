@@ -53,22 +53,16 @@ namespace AVPlus.CrestronCIP
         public static eNamedColour defaultColour = eNamedColour.White;
         public static ushort defaultfontSize = 20;
         
-        public static string CreateAsciiPrintableString(byte[] bArgs)
+        public static string CreateAsciiPrintableString(byte[] b)
         {
-            string strOut_ = "";
-            byte[] b = Encoding.Default.GetBytes(" ~");
-            foreach (byte bIndex_ in bArgs)
-            {
-                if (bIndex_ >= b[0] && bIndex_ <= b[1]) // ASCII
-                {
-                    //strOut_ += String.Format("{0,4}", bIndex_);
+            string strOut_ = String.Empty;
+            byte[] b1 = Encoding.ASCII.GetBytes(" ~");
+            foreach (byte bIndex_ in b)
+            {   
+                if (bIndex_ >= b1[0] && bIndex_ <= b1[1]) // ASCII
                     strOut_ += Encoding.ASCII.GetString(new byte[] { bIndex_ });
-                }
                 else
-                {
-                    string sHexOutput_ = String.Format("{0:X}", bIndex_);
-                    strOut_ += @"\x" + String.Format("{0:X}", sHexOutput_).PadLeft(2, '0');
-                }
+                    strOut_ += String.Format("\\x{0:X2}", bIndex_);
             }
             return strOut_;
         }
@@ -89,14 +83,19 @@ namespace AVPlus.CrestronCIP
             byte[] b = GetBytes(str);
             return CreateHexPrintableString(b);
         }
-        public static byte[] GetBytes(string str) // because no encodings work the way we need
+        public static byte[] GetBytes(string str) // because no other encodings work the way we need
         {
-            //CrestronConsole.PrintLine("GetBytes {0}", str);
-            return Encoding.GetEncoding("ISO-8859-1").GetBytes(str);
+            if (str == null)
+                return new byte[0];
+            else
+                return Encoding.GetEncoding("ISO-8859-1").GetBytes(str);
         }
         public static string GetString(byte[] bytes)
         {
-            return Encoding.GetEncoding("ISO-8859-1").GetString(bytes, 0, bytes.Length);
+            if (bytes == null) 
+                return String.Empty;
+            else
+                return Encoding.GetEncoding("ISO-8859-1").GetString(bytes, 0, bytes.Length);
         }
         //public static byte[] GetBytes(string str) // because no encodings work the way we need
         //{
@@ -118,10 +117,10 @@ namespace AVPlus.CrestronCIP
         //}
         public static string CreateBytesFromHexString(string str)
         {
+            if (str == null)
+                return String.Empty;
             String p1 = @"(\\[xX][0-9a-fA-F]{2}|.)";
-            //String p2 = @"\\x([xX][0-9a-fA-F]{2})";
             Regex r1 = new Regex(p1);
-            //Regex r2 = new Regex(p2);
             MatchCollection m = r1.Matches(str);
             string s1 = "";
             foreach (Match m1 in m)
@@ -131,25 +130,27 @@ namespace AVPlus.CrestronCIP
                 {
                     string s3 = m1.Value.Remove(0, 2);
                     byte b2 = Byte.Parse(s3, System.Globalization.NumberStyles.HexNumber);
-                    s1 = s1 + Encoding.Default.GetString(new byte[] { b2 });
+                    s1 = s1 + GetString(new byte[] { b2 });
                 }
                 else
                 {
-                    byte[] b1 = Encoding.Default.GetBytes(m1.Value);
-                    s1 = s1 + Encoding.Default.GetString(b1);
+                    byte[] b1 = GetBytes(m1.Value);
+                    s1 = s1 + GetString(b1);
                 }
             }
-            byte[] b = Encoding.Default.GetBytes(s1);
+            byte[] b = GetBytes(s1);
             return s1;
         }
-        public static bool GetBit(byte b, int bitNumber)
+        public static bool GetBit(byte b, byte bitNumber)
         {
             return (b & (1 << bitNumber)) != 0;
         }
         public static int SetBit(int b, byte bitNumber, bool val)
         {
-            int r = val == true ? b | (1 << bitNumber) : b & ~(1 << bitNumber); ;
-            return r;
+            if (Math.Pow(2, bitNumber) > int.MaxValue)
+                return b;
+            else
+                return val == true ? b | (1 << bitNumber) : b & ~(1 << bitNumber);
         }
         /*
         public static string Right(this string str, int length)
@@ -164,22 +165,35 @@ namespace AVPlus.CrestronCIP
         */
         public static int Atoi(string strArg) // "hello 123 there" returns 123, because ToInt throws exceptions when non numbers are inserted
         {
-            String m = Regex.Match(strArg, @"\d+").Value;
-            return (m.Length == 0 ? 0 : Convert.ToInt32(m));
+            if (strArg == null)
+                return 0;
+            else
+            {
+                String m = Regex.Match(strArg, @"[-]*\d+").Value;
+                return (m.Length == 0 ? 0 : Convert.ToInt32(m));
+            }
         }
         public static int ConvertRanges(int val, int inMin, int inMax, int outMin, int outMax)
         {
-            int inRange = inMax - inMin;
-            int outRange = outMax - outMin;
-            int result = ((val - inMin) * outRange) / inRange + outMin;
-            return result;
+            if (val < inMin || val > inMax)
+            {
+                Console.WriteLine(String.Format("ConvertRanges: input val not within valid range inMin:{0}, inMax: {1}", inMin, inMax));
+                throw new ArgumentOutOfRangeException("val", String.Format("input val not within valid range inMin:{0}, inMax: {1}", inMin, inMax));
+            }
+            else
+            {
+                int inRange = inMax - inMin;
+                int outRange = outMax - outMin;
+                int result = ((val - inMin) * outRange) / inRange + outMin;
+                return result;
+            }
         }
  
         public static string FormatTextForUi(string text, ushort fontSize, eCrestronFont font, eNamedColour colour)
         {
             if (fontSize == 0)
                 fontSize = defaultfontSize;
-            string str = String.Format("<FONT size=\x22{0}\x22 face=\x22{1}\x22 color=\x22#{2}\x22>{3}</FONT>", fontSize, font, NamedColour[colour], text);
+            string str = String.Format("<FONT size=\x22{0}\x22 face=\x22{1}\x22 color=\x22#{2:X6}\x22>{3}</FONT>", fontSize, font, (uint)colour, text);
             return str;
         }
         public static string FormatTextForUi(string text)
@@ -204,6 +218,17 @@ namespace AVPlus.CrestronCIP
             return Color.FromName(colour).ToArgb();
         }
 
+        #region font dictionary
+
+        public static Dictionary<eCrestronFont, string> CrestronFonts = new Dictionary<eCrestronFont, string>()
+        {
+            { eCrestronFont.Arial                 , "Arial" },
+            { eCrestronFont.Crestron_Sans_Pro     , "Crestron Sans Pro" },
+            { eCrestronFont.Crestron_AV           , "Crestron AV" },
+            { eCrestronFont.Crestron_Simple_Icons , "Crestron Simple Icons" }
+        };
+
+        #endregion
         #region icon dictionaries
 
         public static Dictionary<ushort, string> IconsLgDict = new Dictionary<ushort, string>()
@@ -249,9 +274,9 @@ namespace AVPlus.CrestronCIP
             { 39, "Laptop Alt" },
             { 40, "Laptop" },
             { 41, "MacBook Pro" },
+            { 42, "Music Note Alt" },
             { 43, "Phone Alt" },
             { 44, "Phone" },
-            { 42, "Music Note Alt" },
             { 45, "Pool" },
             { 46, "Airplay" },
             { 47, "Alarm Clock" },
@@ -495,354 +520,473 @@ namespace AVPlus.CrestronCIP
         };
 
         #endregion
-
-        #region colour dictionaries
-
-        // made BasicColour private instead of deleting it
-        private enum eBasicColour
-        {
-            Black,
-            Silver,
-            Gray,
-            White,
-            Maroon,
-            Red,
-            Purple,
-            Fuchsia,
-            Green,
-            Lime,
-            Olive,
-            Yellow,
-            Navy,
-            Blue,
-            Teal,
-            Aqua
-        };
-        private static Dictionary<eBasicColour, string> Html4Colour = new Dictionary<eBasicColour, string>()
-        {
-            { eBasicColour.Black  , "000000" },
-            { eBasicColour.Silver , "C0C0C0" },
-            { eBasicColour.Gray   , "808080" },
-            { eBasicColour.White  , "FFFFFF" },
-            { eBasicColour.Maroon , "800000" },
-            { eBasicColour.Red    , "FF0000" },
-            { eBasicColour.Purple , "800080" },
-            { eBasicColour.Fuchsia, "FF00FF" },
-            { eBasicColour.Green  , "008000" },
-            { eBasicColour.Lime   , "00FF00" },
-            { eBasicColour.Olive  , "808000" },
-            { eBasicColour.Yellow , "FFFF00" },
-            { eBasicColour.Navy   , "000080" },
-            { eBasicColour.Blue   , "0000FF" },
-            { eBasicColour.Teal   , "008080" },
-            { eBasicColour.Aqua   , "00FFFF" }
-        };
-
-        public enum eNamedColour
-        {
-            Black,
-            Navy,
-            DarkBlue,
-            MediumBlue,
-            Blue,
-            DarkGreen,
-            Green,
-            Teal,
-            DarkCyan,
-            DeepSkyBlue,
-            DarkTurquoise,
-            MediumSpringGreen,
-            Lime,
-            SpringGreen,
-            Aqua,
-            Cyan,
-            MidnightBlue,
-            DodgerBlue,
-            LightSeaGreen,
-            ForestGreen,
-            SeaGreen,
-            DarkSlateGray,
-            LimeGreen,
-            MediumSeaGreen,
-            Turquoise,
-            RoyalBlue,
-            SteelBlue,
-            DarkSlateBlue,
-            MediumTurquoise,
-            Indigo,
-            DarkOliveGreen,
-            CadetBlue,
-            CornflowerBlue,
-            MediumAquaMarine,
-            DimGray,
-            SlateBlue,
-            OliveDrab,
-            SlateGray,
-            LightSlateGray,
-            MediumSlateBlue,
-            LawnGreen,
-            Chartreuse,
-            Aquamarine,
-            Maroon,
-            Purple,
-            Olive,
-            Gray,
-            SkyBlue,
-            LightSkyBlue,
-            BlueViolet,
-            DarkRed,
-            DarkMagenta,
-            SaddleBrown,
-            DarkSeaGreen,
-            LightGreen,
-            MediumPurple,
-            DarkViolet,
-            PaleGreen,
-            DarkOrchid,
-            YellowGreen,
-            Sienna,
-            Brown,
-            DarkGray,
-            LightBlue,
-            GreenYellow,
-            PaleTurquoise,
-            LightSteelBlue,
-            PowderBlue,
-            FireBrick,
-            DarkGoldenRod,
-            MediumOrchid,
-            RosyBrown,
-            DarkKhaki,
-            Silver,
-            MediumVioletRed,
-            IndianRed,
-            Peru,
-            Chocolate,
-            Tan,
-            LightGrey,
-            PaleVioletRed,
-            Thistle,
-            Orchid,
-            GoldenRod,
-            Crimson,
-            Gainsboro,
-            Plum,
-            BurlyWood,
-            LightCyan,
-            Lavender,
-            DarkSalmon,
-            Violet,
-            PaleGoldenRod,
-            LightCoral,
-            Khaki,
-            AliceBlue,
-            HoneyDew,
-            Azure,
-            SandyBrown,
-            Wheat,
-            Beige,
-            WhiteSmoke,
-            MintCream,
-            GhostWhite,
-            Salmon,
-            AntiqueWhite,
-            Linen,
-            LightGoldenRodYellow,
-            OldLace,
-            Red,
-            Fuchsia,
-            Magenta,
-            DeepPink,
-            OrangeRed,
-            Tomato,
-            HotPink,
-            Coral,
-            Darkorange,
-            LightSalmon,
-            Orange,
-            LightPink,
-            Pink,
-            Gold,
-            PeachPuff,
-            NavajoWhite,
-            Moccasin,
-            Bisque,
-            MistyRose,
-            BlanchedAlmond,
-            PapayaWhip,
-            LavenderBlush,
-            SeaShell,
-            Cornsilk,
-            LemonChiffon,
-            FloralWhite,
-            Snow,
-            Yellow,
-            LightYellow,
-            Ivory,
-            White,
-        };
-        public static Dictionary<eNamedColour, string> NamedColour = new Dictionary<eNamedColour, string>()
-        {
-            { eNamedColour.Black	        , "000000" },
-            { eNamedColour.Navy	            , "000080" },
-            { eNamedColour.DarkBlue	        , "00008B" },
-            { eNamedColour.MediumBlue	    , "0000CD" },
-            { eNamedColour.Blue	            , "0000FF" },
-            { eNamedColour.DarkGreen	    , "006400" },
-            { eNamedColour.Green	        , "008000" },
-            { eNamedColour.Teal	            , "008080" },
-            { eNamedColour.DarkCyan	        , "008B8B" },
-            { eNamedColour.DeepSkyBlue      , "00BFFF" },
-            { eNamedColour.DarkTurquoise	, "00CED1" },
-            { eNamedColour.MediumSpringGreen, "00FA9A" },
-            { eNamedColour.Lime	            , "00FF00" },	
-            { eNamedColour.SpringGreen	    , "00FF7F" },	
-            { eNamedColour.Aqua	            , "00FFFF" },	
-            { eNamedColour.Cyan	            , "00FFFF" },	
-            { eNamedColour.MidnightBlue	    , "191970" },	
-            { eNamedColour.DodgerBlue	    , "1E90FF" },	
-            { eNamedColour.LightSeaGreen	, "20B2AA" },	
-            { eNamedColour.ForestGreen	    , "228B22" },	
-            { eNamedColour.SeaGreen	        , "2E8B57" },	
-            { eNamedColour.DarkSlateGray	, "2F4F4F" },	
-            { eNamedColour.LimeGreen	    , "32CD32" },	
-            { eNamedColour.MediumSeaGreen	, "3CB371" },	
-            { eNamedColour.Turquoise	    , "40E0D0" },	
-            { eNamedColour.RoyalBlue	    , "4169E1" },	
-            { eNamedColour.SteelBlue	    , "4682B4" },	
-            { eNamedColour.DarkSlateBlue	, "483D8B" },	
-            { eNamedColour.MediumTurquoise  , "48D1CC" },	
-            { eNamedColour.Indigo	        , "4B0082" },	
-            { eNamedColour.DarkOliveGreen	, "556B2F" },	
-            { eNamedColour.CadetBlue	    , "5F9EA0" },	
-            { eNamedColour.CornflowerBlue	, "6495ED" },	
-            { eNamedColour.MediumAquaMarine , "66CDAA" },	
-            { eNamedColour.DimGray	        , "696969" },	
-            { eNamedColour.SlateBlue	    , "6A5ACD" },	
-            { eNamedColour.OliveDrab	    , "6B8E23" },	
-            { eNamedColour.SlateGray	    , "708090" },	
-            { eNamedColour.LightSlateGray	, "778899" },	
-            { eNamedColour.MediumSlateBlue  , "7B68EE" },	
-            { eNamedColour.LawnGreen	    , "7CFC00" },	
-            { eNamedColour.Chartreuse	    , "7FFF00" },	
-            { eNamedColour.Aquamarine	    , "7FFFD4" },	
-            { eNamedColour.Maroon	        , "800000" },	
-            { eNamedColour.Purple	        , "800080" },	
-            { eNamedColour.Olive	        , "808000" },	
-            { eNamedColour.Gray	            , "808080" },	
-            { eNamedColour.SkyBlue	        , "87CEEB" },	
-            { eNamedColour.LightSkyBlue	    , "87CEFA" },	
-            { eNamedColour.BlueViolet	    , "8A2BE2" },	
-            { eNamedColour.DarkRed	        , "8B0000" },	
-            { eNamedColour.DarkMagenta	    , "8B008B" },	
-            { eNamedColour.SaddleBrown	    , "8B4513" },	
-            { eNamedColour.DarkSeaGreen	    , "8FBC8F" },	
-            { eNamedColour.LightGreen	    , "90EE90" },	
-            { eNamedColour.MediumPurple	    , "9370D8" },	
-            { eNamedColour.DarkViolet	    , "9400D3" },	
-            { eNamedColour.PaleGreen	    , "98FB98" },	
-            { eNamedColour.DarkOrchid	    , "9932CC" },	
-            { eNamedColour.YellowGreen	    , "9ACD32" },	
-            { eNamedColour.Sienna	        , "A0522D" },	
-            { eNamedColour.Brown	        , "A52A2A" },	
-            { eNamedColour.DarkGray	        , "A9A9A9" },	
-            { eNamedColour.LightBlue	    , "ADD8E6" },	
-            { eNamedColour.GreenYellow	    , "ADFF2F" },	
-            { eNamedColour.PaleTurquoise	, "AFEEEE" },	
-            { eNamedColour.LightSteelBlue	, "B0C4DE" },	
-            { eNamedColour.PowderBlue	    , "B0E0E6" },	
-            { eNamedColour.FireBrick	    , "B22222" },	
-            { eNamedColour.DarkGoldenRod	, "B8860B" },	
-            { eNamedColour.MediumOrchid	    , "BA55D3" },	
-            { eNamedColour.RosyBrown	    , "BC8F8F" },	
-            { eNamedColour.DarkKhaki	    , "BDB76B" },	
-            { eNamedColour.Silver	        , "C0C0C0" },	
-            { eNamedColour.MediumVioletRed  , "C71585" },	
-            { eNamedColour.IndianRed	    , "CD5C5C" },	
-            { eNamedColour.Peru	            , "CD853F" },	
-            { eNamedColour.Chocolate	    , "D2691E" },	
-            { eNamedColour.Tan	            , "D2B48C" },	
-            { eNamedColour.LightGrey	    , "D3D3D3" },	
-            { eNamedColour.PaleVioletRed	, "D87093" },	
-            { eNamedColour.Thistle	        , "D8BFD8" },	
-            { eNamedColour.Orchid	        , "DA70D6" },	
-            { eNamedColour.GoldenRod	    , "DAA520" },	
-            { eNamedColour.Crimson	        , "DC143C" },	
-            { eNamedColour.Gainsboro	    , "DCDCDC" },	
-            { eNamedColour.Plum	            , "DDA0DD" },	
-            { eNamedColour.BurlyWood	    , "DEB887" },	
-            { eNamedColour.LightCyan	    , "E0FFFF" },	
-            { eNamedColour.Lavender	        , "E6E6FA" },	
-            { eNamedColour.DarkSalmon	    , "E9967A" },	
-            { eNamedColour.Violet	        , "EE82EE" },	
-            { eNamedColour.PaleGoldenRod	, "EEE8AA" },	
-            { eNamedColour.LightCoral	    , "F08080" },	
-            { eNamedColour.Khaki	        , "F0E68C" },	
-            { eNamedColour.AliceBlue	    , "F0F8FF" },	
-            { eNamedColour.HoneyDew	        , "F0FFF0" },	
-            { eNamedColour.Azure	        , "F0FFFF" },	
-            { eNamedColour.SandyBrown	    , "F4A460" },	
-            { eNamedColour.Wheat	        , "F5DEB3" },	
-            { eNamedColour.Beige	        , "F5F5DC" },	
-            { eNamedColour.WhiteSmoke	    , "F5F5F5" },	
-            { eNamedColour.MintCream	    , "F5FFFA" },	
-            { eNamedColour.GhostWhite	    , "F8F8FF" },	
-            { eNamedColour.Salmon	        , "FA8072" },	
-            { eNamedColour.AntiqueWhite	    , "FAEBD7" },	
-            { eNamedColour.Linen	        , "FAF0E6" },	
-            { eNamedColour.LightGoldenRodYellow,"FAFAD2" }, 	
-            { eNamedColour.OldLace	        , "FDF5E6" },	
-            { eNamedColour.Red	            , "FF0000" },	
-            { eNamedColour.Fuchsia	        , "FF00FF" },	
-            { eNamedColour.Magenta	        , "FF00FF" },	
-            { eNamedColour.DeepPink	        , "FF1493" },	
-            { eNamedColour.OrangeRed	    , "FF4500" },	
-            { eNamedColour.Tomato	        , "FF6347" },	
-            { eNamedColour.HotPink	        , "FF69B4" },	
-            { eNamedColour.Coral	        , "FF7F50" },	
-            { eNamedColour.Darkorange	    , "FF8C00" },	
-            { eNamedColour.LightSalmon	    , "FFA07A" },	
-            { eNamedColour.Orange	        , "FFA500" },	
-            { eNamedColour.LightPink	    , "FFB6C1" },	
-            { eNamedColour.Pink	            , "FFC0CB" },	
-            { eNamedColour.Gold	            , "FFD700" },	
-            { eNamedColour.PeachPuff	    , "FFDAB9" },	
-            { eNamedColour.NavajoWhite	    , "FFDEAD" },	
-            { eNamedColour.Moccasin	        , "FFE4B5" },	
-            { eNamedColour.Bisque	        , "FFE4C4" },	
-            { eNamedColour.MistyRose	    , "FFE4E1" },	
-            { eNamedColour.BlanchedAlmond	, "FFEBCD" },	
-            { eNamedColour.PapayaWhip	    , "FFEFD5" },	
-            { eNamedColour.LavenderBlush	, "FFF0F5" },	
-            { eNamedColour.SeaShell	        , "FFF5EE" },	
-            { eNamedColour.Cornsilk	        , "FFF8DC" },	
-            { eNamedColour.LemonChiffon	    , "FFFACD" },	
-            { eNamedColour.FloralWhite 	    , "FFFAF0" },	
-            { eNamedColour.Snow	            , "FFFAFA" },	
-            { eNamedColour.Yellow	        , "FFFF00" },	
-            { eNamedColour.LightYellow      , "FFFFE0" },	
-            { eNamedColour.Ivory	        , "FFFFF0" },	
-            { eNamedColour.White	        , "FFFFFF" }
-        };
-
-        #endregion
-
-        #region font dictionary
-
-        public enum eCrestronFont
-        {
-            Arial,
-            Crestron_Sans_Pro,
-            Crestron_AV,
-        };
-        public static Dictionary<eCrestronFont, string> CrestronFonts = new Dictionary<eCrestronFont, string>()
-        {
-            { eCrestronFont.Arial               , "Arial" },
-            { eCrestronFont.Crestron_Sans_Pro   , "Crestron Sans Pro" },
-            { eCrestronFont.Crestron_AV         , "Crestron AV" }
-        };
-
-        #endregion
-
     }
+
+    public enum eBasicColour
+    {
+        Black   = 0x000000,
+        Silver  = 0xC0C0C0,
+        Gray    = 0x808080,
+        White   = 0xFFFFFF,
+        Maroon  = 0x800000,
+        Red     = 0xFF0000,
+        Purple  = 0x800080,
+        Fuchsia = 0xFF00FF,
+        Green   = 0x008000,
+        Lime    = 0x00FF00,
+        Olive   = 0x808000,
+        Yellow  = 0xFFFF00,
+        Navy    = 0x000080,
+        Blue    = 0x0000FF,
+        Teal    = 0x008080,
+        Aqua    = 0x00FFFF
+    };
+    public enum eNamedColour
+    {
+        Black             = 0x000000,
+        Navy              = 0x000080,
+        DarkBlue          = 0x00008B,
+        MediumBlue        = 0x0000CD,
+        Blue              = 0x0000FF,
+        DarkGreen         = 0x006400,
+        Green             = 0x008000,
+        Teal              = 0x008080,
+        DarkCyan          = 0x008B8B,
+        DeepSkyBlue       = 0x00BFFF,
+        DarkTurquoise     = 0x00CED1,
+        MediumSpringGreen = 0x00FA9A,
+        Lime              = 0x00FF00,
+        SpringGreen       = 0x00FF7F,
+        Aqua              = 0x00FFFF,
+        Cyan              = 0x00FFFF,
+        MidnightBlue      = 0x191970,
+        DodgerBlue        = 0x1E90FF,
+        LightSeaGreen     = 0x20B2AA,
+        ForestGreen       = 0x228B22,
+        SeaGreen          = 0x2E8B57,
+        DarkSlateGray     = 0x2F4F4F,
+        LimeGreen         = 0x32CD32,
+        MediumSeaGreen    = 0x3CB371,
+        Turquoise         = 0x40E0D0,
+        RoyalBlue         = 0x4169E1,
+        SteelBlue         = 0x4682B4,
+        DarkSlateBlue     = 0x483D8B,
+        MediumTurquoise   = 0x48D1CC,
+        Indigo            = 0x4B0082,
+        DarkOliveGreen    = 0x556B2F,
+        CadetBlue         = 0x5F9EA0,
+        CornflowerBlue    = 0x6495ED,
+        MediumAquaMarine  = 0x66CDAA,
+        DimGray           = 0x696969,
+        SlateBlue         = 0x6A5ACD,
+        OliveDrab         = 0x6B8E23,
+        SlateGray         = 0x708090,
+        LightSlateGray    = 0x778899,
+        MediumSlateBlue   = 0x7B68EE,
+        LawnGreen         = 0x7CFC00,
+        Chartreuse        = 0x7FFF00,
+        Aquamarine        = 0x7FFFD4,
+        Maroon            = 0x800000,
+        Purple            = 0x800080,
+        Olive             = 0x808000,
+        Gray              = 0x808080,
+        SkyBlue           = 0x87CEEB,
+        LightSkyBlue      = 0x87CEFA,
+        BlueViolet        = 0x8A2BE2,
+        DarkRed           = 0x8B0000,
+        DarkMagenta       = 0x8B008B,
+        SaddleBrown       = 0x8B4513,
+        DarkSeaGreen      = 0x8FBC8F,
+        LightGreen        = 0x90EE90,
+        MediumPurple      = 0x9370D8,
+        DarkViolet        = 0x9400D3,
+        PaleGreen         = 0x98FB98,
+        DarkOrchid        = 0x9932CC,
+        YellowGreen       = 0x9ACD32,
+        Sienna            = 0xA0522D,
+        Brown             = 0xA52A2A,
+        DarkGray          = 0xA9A9A9,
+        LightBlue         = 0xADD8E6,
+        GreenYellow       = 0xADFF2F,
+        PaleTurquoise     = 0xAFEEEE,
+        LightSteelBlue    = 0xB0C4DE,
+        PowderBlue        = 0xB0E0E6,
+        FireBrick         = 0xB22222,
+        DarkGoldenRod     = 0xB8860B,
+        MediumOrchid      = 0xBA55D3,
+        RosyBrown         = 0xBC8F8F,
+        DarkKhaki         = 0xBDB76B,
+        Silver            = 0xC0C0C0,
+        MediumVioletRed   = 0xC71585,
+        IndianRed         = 0xCD5C5C,
+        Peru              = 0xCD853F,
+        Chocolate         = 0xD2691E,
+        Tan               = 0xD2B48C,
+        LightGrey         = 0xD3D3D3,
+        PaleVioletRed     = 0xD87093,
+        Thistle           = 0xD8BFD8,
+        Orchid            = 0xDA70D6,
+        GoldenRod         = 0xDAA520,
+        Crimson           = 0xDC143C,
+        Gainsboro         = 0xDCDCDC,
+        Plum              = 0xDDA0DD,
+        BurlyWood         = 0xDEB887,
+        LightCyan         = 0xE0FFFF,
+        Lavender          = 0xE6E6FA,
+        DarkSalmon        = 0xE9967A,
+        Violet            = 0xEE82EE,
+        PaleGoldenRod     = 0xEEE8AA,
+        LightCoral        = 0xF08080,
+        Khaki             = 0xF0E68C,
+        AliceBlue         = 0xF0F8FF,
+        HoneyDew          = 0xF0FFF0,
+        Azure             = 0xF0FFFF,
+        SandyBrown        = 0xF4A460,
+        Wheat             = 0xF5DEB3,
+        Beige             = 0xF5F5DC,
+        WhiteSmoke        = 0xF5F5F5,
+        MintCream         = 0xF5FFFA,
+        GhostWhite        = 0xF8F8FF,
+        Salmon            = 0xFA8072,
+        AntiqueWhite      = 0xFAEBD7,
+        Linen             = 0xFAF0E6,
+        LightGoldenRodYellow = 0xFAFAD2,
+        OldLace           = 0xFDF5E6,
+        Red               = 0xFF0000,
+        Fuchsia           = 0xFF00FF,
+        Magenta           = 0xFF00FF,
+        DeepPink          = 0xFF1493,
+        OrangeRed         = 0xFF4500,
+        Tomato            = 0xFF6347,
+        HotPink           = 0xFF69B4,
+        Coral             = 0xFF7F50,
+        Darkorange        = 0xFF8C00,
+        LightSalmon       = 0xFFA07A,
+        Orange            = 0xFFA500,
+        LightPink         = 0xFFB6C1,
+        Pink              = 0xFFC0CB,
+        Gold              = 0xFFD700,
+        PeachPuff         = 0xFFDAB9,
+        NavajoWhite       = 0xFFDEAD,
+        Moccasin          = 0xFFE4B5,
+        Bisque            = 0xFFE4C4,
+        MistyRose         = 0xFFE4E1,
+        BlanchedAlmond    = 0xFFEBCD,
+        PapayaWhip        = 0xFFEFD5,
+        LavenderBlush     = 0xFFF0F5,
+        SeaShell          = 0xFFF5EE,
+        Cornsilk          = 0xFFF8DC,
+        LemonChiffon      = 0xFFFACD,
+        FloralWhite       = 0xFFFAF0,
+        Snow              = 0xFFFAFA,
+        Yellow            = 0xFFFF00,
+        LightYellow       = 0xFFFFE0,
+        Ivory             = 0xFFFFF0,
+        White             = 0xFFFFFF
+    };
+
+    public enum eCrestronFont
+    {
+        Arial,
+        Crestron_Sans_Pro,
+        Crestron_AV,
+        Crestron_Simple_Icons
+    };
+
+    public enum eCrestronIconType
+    {
+        None = 0,
+        Font = 1,
+        AnalogIconsLg = 2,
+        SerialIconsLg = 3,
+        AnalogIconsMediaTransports = 4,
+        SerialIconsMediaTransports = 5
+    };
+
+    public enum eIconsLg 
+    {
+        AM_FM                   = 0,
+        CD                      = 1,
+        Climate                 = 2,
+        DisplayAlt              = 3, // black LCD monitor
+        Display                 = 4, // blue LCD monitor
+        DVR                     = 5, // DVR text on red btn
+        EnergyManagement        = 6,
+        Favorites               = 7,
+        FilmReel                = 8,
+        Home                    = 9,
+        InternetRadio           = 10, 
+        iPod                    = 11, 
+        iServer                 = 12, 
+        Lights                  = 13, 
+        MusicNote               = 14, 
+        News                    = 15, 
+        Pandora                 = 16, 
+        Power                   = 17, 
+        SatelliteAlt            = 18, 
+        Satellite               = 19, 
+        Sec_Cam                 = 20, // black on pivot mount
+        Security                = 21, 
+        Shades                  = 22, 
+        UserGroup               = 23, 
+        VideoConferencing       = 24, 
+        VideoSwitcher           = 25, 
+        Wand                    = 26, 
+        Weather                 = 27, 
+        Speaker                 = 29, 
+        Mic                     = 30, 
+        Projector               = 31, 
+        Screen                  = 32, 
+        Gear                    = 33, 
+        Sec_CamAlt              = 34, // white no PTZ 
+        DocumentCamera          = 35,  // lens over paper
+        Backgrounds             = 36, 
+        Gamepad                 = 37, 
+        iMac                    = 38, 
+        LaptopAlt               = 39, 
+        Laptop                  = 40, 
+        MacBookPro              = 41, 
+        MusicNoteAlt            = 42, 
+        PhoneAlt                = 43, 
+        Phone                   = 44, 
+        Pool                    = 45, 
+        Airplay                 = 46, 
+        AlarmClock              = 47, 
+        AppleTV                 = 48, 
+        AUXPlate                = 49, 
+        DocumentCameraAlt       = 50,  // full doccam
+        DoorStation             = 51, 
+        DVRAlt                  = 52,  // DVR and remote
+        FrontDoorAlt            = 53, 
+        FrontDoor               = 54, 
+        Jukebox                 = 55, 
+        Piano                   = 56, 
+        Playstation3            = 57, 
+        PlaystationLogo         = 58, 
+        RoomDoor                = 59, 
+        SmarTV                  = 60, 
+        Sprinkler               = 61, 
+        Tablet                  = 62, 
+        TV                      = 63,  // TV with remote
+        VCR                     = 64, 
+        VideoConferencingAlt    = 65, 
+        Wii_ULogo               = 67, 
+        Wii                     = 69, 
+        Xbox360                 = 70, 
+        XboxLogo                = 71, 
+        Amenities               = 72, 
+        DirecTV                 = 73, 
+        DishNetwork             = 74, 
+        Drapes                  = 75, 
+        Garage                  = 76, 
+        Macros                  = 77, 
+        Scheduler               = 78, 
+        Sirius_XMSatelliteRadio = 79, 
+        TiVo                    = 80, 
+        Blu_ray                 = 81, 
+        DVD                     = 82, 
+        RecordPlayer            = 83, 
+        Vudu                    = 84, 
+        HomeAlt                 = 85, 
+        SiriusSatelliteRadio    = 86, 
+        Rhapsody                = 87, 
+        Spotify                 = 88, 
+        Tunein                  = 89, 
+        XMSatelliteRadio        = 90, 
+        LastFM                  = 91, 
+        YouTube                 = 92, 
+        Kaleidescape            = 93, 
+        Hulu                    = 94, 
+        Netflix                 = 95, 
+        Clapper                 = 96, 
+        Web                     = 98, 
+        PC                      = 99,
+        Amazon                  = 100,
+        Chrome                  = 101,
+        Blank                   = 102,
+        Fireplace               = 103
+    };
+    public enum eIconsMediaTransports
+    {
+        Alert            = 0,
+        AudioNote        = 1,
+        Blu_ray          = 2,
+        Bolt             = 3,
+        CD               = 4,
+        Check            = 5,
+        Climate          = 6,
+        Delete           = 7,
+        DownAlt          = 8,
+        Down             = 9,
+        Eject            = 10,
+        Enter            = 11,
+        Film             = 12,
+        Fwd              = 13,
+        Home             = 14,
+        Left             = 15,
+        LeftAlt          = 16,
+        Lights           = 17,
+        Live             = 18,
+        Minus            = 19,
+        NextPage         = 20,
+        Next             = 21,
+        Pause            = 22,
+        Phone            = 23,
+        Play             = 24,
+        Play_Pause       = 25,
+        Plus             = 26,
+        Power            = 27,
+        PrevPage         = 28,
+        Previous         = 29,
+        Rec              = 30,
+        Repeat           = 31,
+        Replay           = 32,
+        Rew              = 33,
+        RightAlt         = 34,
+        Right            = 35,
+        RSS              = 36,
+        Shuffle          = 37,
+        Stop             = 38,
+        Theatre          = 39,
+        ThumbDown        = 40,
+        ThumbUp          = 41,
+        Triangle         = 42,
+        UpAlt            = 43,
+        Up               = 44,
+        VideoScreen      = 45,
+        VolumeHi         = 46,
+        VolumeLo         = 47,
+        VolumeMute       = 48,
+        AddressBook      = 49,
+        Alarm            = 50,
+        Calendar         = 51,
+        Clock            = 52,
+        Eye              = 53,
+        Game             = 54,
+        Gear             = 55,
+        Globe            = 56,
+        Help             = 57,
+        Image            = 58,
+        Info             = 59,
+        Keypad           = 60,
+        MagnifyingGlass  = 61,
+        Mic              = 62,
+        PhoneDown        = 63,
+        SnowFlake        = 65,
+        Sun              = 66,
+        Users            = 67,
+        Door             = 68,
+        Drapes           = 69,
+        Fire             = 70,
+        iPad             = 71,
+        iPhone_iPodTouch = 72,
+        iPod             = 73,
+        MicMute          = 74,
+        PadlockClosed    = 75,
+        PadlockOpen      = 76,
+        Pool             = 77,
+        Settings         = 78,
+        Shades           = 79,
+        Share            = 80,
+        Shield           = 81,
+        Slow             = 82,
+        TV               = 83,
+        User             = 84,
+        Wi_Fi            = 85,
+        RepeatItem       = 86,
+        RepeatOff        = 87,
+        ShuffleItem      = 88,
+        ShuffleOff       = 89,
+        SongAdd          = 90,
+        Star             = 91,
+        UserBookmark     = 92,
+        PlayAll          = 93,
+        PlayAlt          = 94,
+        PlayLibrary      = 95,
+        PlayList         = 96,
+        Weather          = 97,
+        Projector        = 98,
+        Camera           = 99,
+        DownloadCloud    = 100,
+        RadioSignal      = 101,
+        Satellite        = 102,
+        Laptop           = 103,
+        DVD              = 104,
+        Pen              = 105,
+        Brush            = 106,
+        CheckboxChecked  = 107,
+        CheckboxOff      = 108,
+        List             = 109,
+        Android          = 110,
+        Apple            = 111,
+        BatteryLow       = 112,
+        BatteryCharging  = 113,
+        BatteryEmpty     = 114,
+        BatteryFull      = 115,
+        Bluetooth        = 116,
+        Brightness       = 117,
+        Cart             = 118,
+        ConnectorPlate   = 119,
+        Connector        = 120,
+        Contrast         = 121,
+        Dashboard        = 122,
+        DeleteAlt        = 123,
+        Download         = 124,
+        Garage           = 125,
+        GraphAlt         = 126,
+        Graph            = 127,
+        Grid             = 128,
+        Guide            = 129,
+        HD               = 130,
+        HotTub           = 131,
+        Keyboard         = 132,
+        LightsOff        = 133,
+        Lync             = 134,
+        MediaServer      = 135,
+        Mouse            = 136,
+        Outlet           = 137,
+        System           = 138,
+        Trashcan         = 139,
+        VideoInput       = 143,
+        VideoOutput      = 144,
+        Windows          = 145,
+        WirelessDevice   = 146,
+        Wrench           = 147,
+        Stopwatch        = 148,
+        CommentCheck     = 149,
+        Comment          = 150,
+        Crestron         = 151,
+        LastFM           = 152,
+        LocationMinus    = 153,
+        LocationPlus     = 154,
+        Location         = 155,
+        Pandora          = 156,
+        Rhapsody         = 157,
+        Sirius           = 158,
+        SiriusXM         = 159,
+        Spotify          = 160,
+        UserMinus        = 161,
+        XM               = 162,
+        UserCheck        = 163,
+        Disk             = 164,
+        Ban              = 165,
+        Heart            = 166,
+        DND              = 167,
+        Eraser           = 168,
+        Blank            = 169,
+        MicMuted         = 170,
+        VolumeMuted      = 171,
+        OptionsOff       = 172,
+        BrightnessMedium = 173,
+        BrightnessMax    = 174,
+        Folder           = 175,
+        DNDOn            = 176,
+        OptionsOn        = 177,
+        NetworkWi_FiOff  = 178,
+        NetworkWi_FiLow  = 179,
+        NetworkWi_FiMed  = 180,
+        NetworkWi_FiMax  = 181,
+        Fireplace        = 182,
+        More             = 183
+    };
 }

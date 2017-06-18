@@ -220,7 +220,7 @@ namespace AVPlus.CrestronCIP
                 {
                     default:
                         string buttonText = "Item " + idx.ToString();
-                        string formattedText = StringHelper.FormatTextForUi(buttonText, 20, StringHelper.eCrestronFont.Crestron_Sans_Pro, StringHelper.eNamedColour.White);
+                        string formattedText = StringHelper.FormatTextForUi(buttonText, 20, eCrestronFont.Crestron_Sans_Pro, eNamedColour.White);
                         SetSmartObjectText      (currentDevice, SG_BTN_LIST, number, buttonText);
 
                         // toggle the button feedback and put some text onto it
