@@ -48,7 +48,7 @@ The code is the current documentation, feel free to create some documentation on
 
 ## Tests
 
-Test project "Crestron CIP Tests" contains all tests.
+Test project "Crestron CIP Tests" contains all tests using NUnit.
 Test coverage is incomplete, additional tests are welcomed.
 
 ## Known issues
