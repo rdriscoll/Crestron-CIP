@@ -48,7 +48,8 @@ The code is the current documentation, feel free to create some documentation on
 
 ## Tests
 
-Tests are not implemented, feel free to make some and send a pull request.
+Test project "Crestron CIP Tests" contains all tests.
+Test coverage is incomplete, additional tests are welcomed.
 
 ## Known issues
 Refer to: [Known issues](https://github.com/rdriscoll/Crestron-CIP/issues)
